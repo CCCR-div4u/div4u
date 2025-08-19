@@ -295,7 +295,7 @@ jobs:
                     {
                       "type": "button",
                       "text": "✅ Approve Deployment",
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/workflows/manual-approval.yml",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/issues",
                       "style": "primary"
                     },
                     {
@@ -319,12 +319,18 @@ jobs:
       - name: Get repository collaborators
         id: get-collaborators
         run: |
-          # Get repository collaborators with admin/maintain permissions
+          # Get repository collaborators with admin permissions
           COLLABORATORS=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "${{ github.api_url }}/repos/${{ github.repository }}/collaborators?permission=admin" \
             | jq -r '.[].login' | tr '\n' ',' | sed 's/,$//')
+          
+          # Fallback to repository owner if no collaborators found
+          if [ -z "$COLLABORATORS" ]; then
+            COLLABORATORS="${{ github.repository_owner }}"
+          fi
+          
           echo "Repository admins: $COLLABORATORS"
           echo "collaborators=$COLLABORATORS" >> $GITHUB_OUTPUT
 
@@ -358,7 +364,7 @@ jobs:
             **✅ To approve:** Comment with `approved`, `approve`, `lgtm`, or `yes`  
             **❌ To reject:** Comment with `denied`, `deny`, `rejected`, or `no`
             
-            **⏰ This approval will timeout in 60 minutes.**
+            **⏰ Manual approval required to proceed with deployment.**
 
   push-images:
     name: Push Images
