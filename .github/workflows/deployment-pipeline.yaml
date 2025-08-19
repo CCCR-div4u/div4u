@@ -320,18 +320,29 @@ jobs:
         id: get-collaborators
         run: |
           # Get repository collaborators with admin permissions
-          COLLABORATORS=$(curl -s \
+          echo "Fetching repository collaborators..."
+          API_RESPONSE=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/collaborators?permission=admin" \
-            | jq -r '.[].login' | tr '\n' ',' | sed 's/,$//')
+            "${{ github.api_url }}/repos/${{ github.repository }}/collaborators?permission=admin")
           
-          # Fallback to repository owner if no collaborators found
-          if [ -z "$COLLABORATORS" ]; then
+          echo "API Response: $API_RESPONSE"
+          
+          COLLABORATORS=$(echo "$API_RESPONSE" | jq -r '.[].login' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
+          
+          # Multiple fallback strategies
+          if [ -z "$COLLABORATORS" ] || [ "$COLLABORATORS" = "null" ]; then
+            echo "No admin collaborators found, trying repository owner..."
             COLLABORATORS="${{ github.repository_owner }}"
           fi
           
-          echo "Repository admins: $COLLABORATORS"
+          # Final safety check
+          if [ -z "$COLLABORATORS" ] || [ "$COLLABORATORS" = "null" ]; then
+            echo "Repository owner also empty, using actor as fallback..."
+            COLLABORATORS="${{ github.actor }}"
+          fi
+          
+          echo "Final approvers: $COLLABORATORS"
           echo "collaborators=$COLLABORATORS" >> $GITHUB_OUTPUT
 
       - name: Wait for approval from repository owners
