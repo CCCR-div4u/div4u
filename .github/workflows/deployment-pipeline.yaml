@@ -179,10 +179,197 @@ jobs:
           sarif_file: 'trivy-${{ matrix.service.name }}-results.sarif'
           category: 'trivy-${{ matrix.service.name }}'
 
+      - name: Upload scan results as artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-${{ matrix.service.name }}-results
+          path: trivy-${{ matrix.service.name }}-results.sarif
+          retention-days: 30
+
+  slack-approval:
+    name: Security Review & Deployment Approval
+    runs-on: ubuntu-latest
+    needs: security-scan
+    if: always()
+    permissions:
+      contents: read
+      actions: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download security scan results
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: trivy-*-results
+          merge-multiple: true
+
+      - name: Parse security scan results
+        id: parse-results
+        run: |
+          CRITICAL=0
+          HIGH=0
+          MEDIUM=0
+          SERVICES=""
+          
+          for file in trivy-*-results.sarif; do
+            if [ -f "$file" ]; then
+              SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
+              SERVICES="$SERVICES $SERVICE"
+              
+              # Count vulnerabilities by severity
+              if command -v jq >/dev/null 2>&1; then
+                CRIT_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "error")] | length' "$file" 2>/dev/null || echo 0)
+                HIGH_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "warning")] | length' "$file" 2>/dev/null || echo 0)
+                MED_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "note")] | length' "$file" 2>/dev/null || echo 0)
+                
+                CRITICAL=$((CRITICAL + CRIT_COUNT))
+                HIGH=$((HIGH + HIGH_COUNT))
+                MEDIUM=$((MEDIUM + MED_COUNT))
+              fi
+            fi
+          done
+          
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+
+      - name: Send Slack approval request
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#div4u-ci-alerts'
+          custom_payload: |
+            {
+              "text": "🔍 Security Scan Complete - Deployment Approval Required",
+              "attachments": [
+                {
+                  "color": "${{ steps.parse-results.outputs.critical > 0 && 'danger' || steps.parse-results.outputs.high > 0 && 'warning' || 'good' }}",
+                  "fields": [
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Services Scanned",
+                      "value": "${{ steps.parse-results.outputs.services }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>",
+                      "short": true
+                    },
+                    {
+                      "title": "🚨 Critical",
+                      "value": "${{ steps.parse-results.outputs.critical }}",
+                      "short": true
+                    },
+                    {
+                      "title": "⚠️ High",
+                      "value": "${{ steps.parse-results.outputs.high }}",
+                      "short": true
+                    },
+                    {
+                      "title": "📋 Medium",
+                      "value": "${{ steps.parse-results.outputs.medium }}",
+                      "short": true
+                    },
+                    {
+                      "title": "📊 Security Report",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Detailed Results>",
+                      "short": true
+                    }
+                  ],
+                  "actions": [
+                    {
+                      "type": "button",
+                      "text": "✅ Approve Deployment",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/workflows/manual-approval.yml",
+                      "style": "primary"
+                    },
+                    {
+                      "type": "button",
+                      "text": "📋 View Security Details",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/security"
+                    },
+                    {
+                      "type": "button",
+                      "text": "❌ Cancel Deployment",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "style": "danger"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Get repository collaborators
+        id: get-collaborators
+        run: |
+          # Get repository collaborators with admin permissions
+          COLLABORATORS=$(curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/collaborators?permission=admin" \
+            | jq -r '.[].login' | tr '\n' ',' | sed 's/,$//')
+          
+          # Fallback to repository owner if no collaborators found
+          if [ -z "$COLLABORATORS" ]; then
+            COLLABORATORS="${{ github.repository_owner }}"
+          fi
+          
+          echo "Repository admins: $COLLABORATORS"
+          echo "collaborators=$COLLABORATORS" >> $GITHUB_OUTPUT
+
+      - name: Wait for approval from repository owners
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ steps.get-collaborators.outputs.collaborators }}
+          minimum-approvals: 1
+          issue-title: "🔍 Security Review & Deployment Approval - ${{ github.ref_name }}"
+          issue-body: |
+            ## 🔍 Security Scan Results Summary
+            
+            **Repository:** ${{ github.repository }}  
+            **Branch:** ${{ github.ref_name }}  
+            **Commit:** ${{ github.sha }}  
+            **Services Scanned:** ${{ steps.parse-results.outputs.services }}
+            
+            ### 📊 Vulnerability Summary
+            - 🚨 **Critical:** ${{ steps.parse-results.outputs.critical }}
+            - ⚠️ **High:** ${{ steps.parse-results.outputs.high }}
+            - 📋 **Medium:** ${{ steps.parse-results.outputs.medium }}
+            
+            ### 🔗 Quick Links
+            - [📊 Security Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [🛡️ Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
+            - [📝 Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            
+            ---
+            
+            **✅ To approve:** Comment with `approved`, `approve`, `lgtm`, or `yes`  
+            **❌ To reject:** Comment with `denied`, `deny`, `rejected`, or `no`
+            
+            **⏰ Manual approval required to proceed with deployment.**
+
   push-images:
     name: Push Images
     runs-on: ubuntu-latest
-    needs: security-scan
+    needs: slack-approval
     permissions:
       contents: read
       packages: write
