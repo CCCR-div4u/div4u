@@ -26,7 +26,7 @@ spec:
       - name: harbor-registry-secret
       containers:
       - name: frontend
-        image: harbor.bluesunnywings.com/div4u/div4u-frontend:3f817980ad1e03dc06fc0205b0e7caa3604c0521
+        image: harbor.bluesunnywings.com/div4u/div4u-frontend:ce2e9e9c06ea642baf0720f80c1578ca70ee1aae
         imagePullPolicy: Always
         ports:
         - containerPort: 80
