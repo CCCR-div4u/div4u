@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: div4u
+  labels:
+    name: div4u
+    app: div4u-service

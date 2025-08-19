@@ -1,0 +1,81 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- 캐릭터 배경 (행복한 상태 - 초록 오라) -->
+  <circle cx="100" cy="100" r="90" fill="#E8F5E8" stroke="#4CAF50" stroke-width="4"/>
+  
+  <!-- 캐릭터 얼굴 (밝은) -->
+  <circle cx="100" cy="85" r="45" fill="#FFF8E1"/>
+  
+  <!-- 행복한 눈 (반달 모양) -->
+  <path d="M 80 75 Q 85 70 90 75" stroke="#333" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 110 75 Q 115 70 120 75" stroke="#333" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- 행복한 입 (큰 미소) -->
+  <path d="M 80 95 Q 100 110 120 95" stroke="#333" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- 분홍 볼 -->
+  <circle cx="70" cy="85" r="8" fill="#FFB3E6" opacity="0.7"/>
+  <circle cx="130" cy="85" r="8" fill="#FFB3E6" opacity="0.7"/>
+  
+  <!-- 서울 타워 모자 (반짝이는) -->
+  <rect x="90" y="35" width="20" height="30" fill="#FF6B6B" rx="2"/>
+  <circle cx="100" cy="30" r="8" fill="#4ECDC4"/>
+  <rect x="98" y="25" width="4" height="10" fill="#45B7D1"/>
+  
+  <!-- 몸체 -->
+  <ellipse cx="100" cy="150" rx="35" ry="25" fill="#81C784"/>
+  
+  <!-- 팔 (기쁘게 올린) -->
+  <ellipse cx="72" cy="135" rx="12" ry="20" fill="#FFF8E1" transform="rotate(-10 72 135)"/>
+  <ellipse cx="128" cy="135" rx="12" ry="20" fill="#FFF8E1" transform="rotate(10 128 135)"/>
+  
+  <!-- 손 -->
+  <circle cx="67" cy="150" r="8" fill="#FFF8E1"/>
+  <circle cx="133" cy="150" r="8" fill="#FFF8E1"/>
+  
+  <!-- 반짝이 효과 -->
+  <g fill="#FFD700" opacity="0.9">
+    <g>
+      <circle cx="60" cy="50" r="3">
+        <animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/>
+        <animate attributeName="r" values="2;4;2" dur="1.5s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    <g>
+      <circle cx="140" cy="60" r="2.5">
+        <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" begin="0.3s"/>
+        <animate attributeName="r" values="1.5;3;1.5" dur="1.2s" repeatCount="indefinite" begin="0.3s"/>
+      </circle>
+    </g>
+    <g>
+      <circle cx="120" cy="40" r="2">
+        <animate attributeName="opacity" values="0;1;0" dur="1.8s" repeatCount="indefinite" begin="0.6s"/>
+        <animate attributeName="r" values="1;3;1" dur="1.8s" repeatCount="indefinite" begin="0.6s"/>
+      </circle>
+    </g>
+    <g>
+      <circle cx="80" cy="45" r="2.5">
+        <animate attributeName="opacity" values="0;1;0" dur="1.3s" repeatCount="indefinite" begin="0.9s"/>
+        <animate attributeName="r" values="1.5;3.5;1.5" dur="1.3s" repeatCount="indefinite" begin="0.9s"/>
+      </circle>
+    </g>
+  </g>
+  
+  <!-- 하트 효과 -->
+  <g fill="#FF69B4" opacity="0.8">
+    <g transform="translate(130, 70)">
+      <path d="M 0,-3 C -3,-6 -9,-6 -9,0 C -9,-6 -15,-6 -18,-3 C -18,3 -9,12 -9,12 C -9,12 0,3 0,-3 Z" transform="scale(0.3)">
+        <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite"/>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 0,-10; 0,-20" dur="2s" repeatCount="indefinite"/>
+      </path>
+    </g>
+    <g transform="translate(70, 75)">
+      <path d="M 0,-3 C -3,-6 -9,-6 -9,0 C -9,-6 -15,-6 -18,-3 C -18,3 -9,12 -9,12 C -9,12 0,3 0,-3 Z" transform="scale(0.25)">
+        <animate attributeName="opacity" values="0;1;0" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+        <animateTransform attributeName="transform" type="translate" values="0,0; 0,-8; 0,-15" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+      </path>
+    </g>
+  </g>
+  
+  <!-- 서울 텍스트 -->
+  <text x="100" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#4CAF50">SEOUL</text>
+</svg>

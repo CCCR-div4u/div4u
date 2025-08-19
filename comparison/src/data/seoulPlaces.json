@@ -1,0 +1,106 @@
+[
+  {
+    "areaCode": "POI001",
+    "areaName": "강남 MICE 관광특구",
+    "displayName": "강남 MICE 관광특구",
+    "engName": "Gangnam MICE Special Tourist Zone",
+    "category": "관광특구",
+    "keywords": ["강남", "MICE", "관광특구", "gangnam", "mice"]
+  },
+  {
+    "areaCode": "POI007",
+    "areaName": "홍대 관광특구",
+    "displayName": "홍대 일대",
+    "engName": "HongDae Culture & Arts Special Tourist Zone",
+    "category": "관광특구",
+    "keywords": ["홍대", "홍익대", "홍대입구", "hongdae", "문화", "예술"]
+  },
+  {
+    "areaCode": "POI003",
+    "areaName": "명동 관광특구",
+    "displayName": "명동 일대",
+    "engName": "Myeong-dong Special Tourist Zone",
+    "category": "관광특구",
+    "keywords": ["명동", "남대문", "북창동", "다동", "무교동", "myeongdong"]
+  },
+  {
+    "areaCode": "POI014",
+    "areaName": "강남역",
+    "displayName": "강남역 일대",
+    "engName": "Gangnam station",
+    "category": "인구밀집지역",
+    "keywords": ["강남역", "강남", "테헤란로", "gangnam", "station"]
+  },
+  {
+    "areaCode": "POI055",
+    "areaName": "홍대입구역(2호선)",
+    "displayName": "홍대입구역 일대",
+    "engName": "Hongik University station(Line 2)",
+    "category": "인구밀집지역",
+    "keywords": ["홍대입구역", "홍대입구", "홍익대학교", "2호선", "hongik"]
+  },
+  {
+    "areaCode": "POI040",
+    "areaName": "신촌·이대역",
+    "displayName": "신촌·이대역 일대",
+    "engName": "Sinchon·Ewha Womans University station",
+    "category": "인구밀집지역",
+    "keywords": ["신촌", "이대", "이화여대", "sinchon", "ewha"]
+  },
+  {
+    "areaCode": "POI059",
+    "areaName": "가로수길",
+    "displayName": "가로수길 일대",
+    "engName": "Garosu-gil",
+    "category": "발달상권",
+    "keywords": ["가로수길", "신사동", "압구정", "garosu", "tree"]
+  },
+  {
+    "areaCode": "POI078",
+    "areaName": "인사동",
+    "displayName": "인사동 일대",
+    "engName": "Insa-dong",
+    "category": "발달상권",
+    "keywords": ["인사동", "전통", "한옥", "insadong", "traditional"]
+  },
+  {
+    "areaCode": "POI073",
+    "areaName": "연남동",
+    "displayName": "연남동 일대",
+    "engName": "Yeonnam-dong",
+    "category": "발달상권",
+    "keywords": ["연남동", "연트럴파크", "홍대", "yeonnam"]
+  },
+  {
+    "areaCode": "POI095",
+    "areaName": "반포한강공원",
+    "displayName": "반포한강공원",
+    "engName": "Banpo Hangang Park",
+    "category": "공원",
+    "keywords": ["반포", "한강공원", "한강", "banpo", "hangang", "park"]
+  },
+  {
+    "areaCode": "POI101",
+    "areaName": "서울숲공원",
+    "displayName": "서울숲공원",
+    "engName": "Seoul Forest",
+    "category": "공원",
+    "keywords": ["서울숲", "성수동", "forest", "seoul"]
+  },
+  {
+    "areaCode": "POI008",
+    "areaName": "경복궁",
+    "displayName": "경복궁",
+    "engName": "Gyeongbokgung Palace",
+    "category": "고궁·문화유산",
+    "keywords": ["경복궁", "궁궐", "광화문", "gyeongbok", "palace"]
+  },
+  {
+    "areaCode": "POI009",
+    "areaName": "광화문·덕수궁",
+    "displayName": "광화문·덕수궁 일대",
+    "engName": "Gwanghwamun & Deoksugung Palace",
+    "category": "고궁·문화유산",
+    "keywords": ["광화문", "덕수궁", "궁궐", "gwanghwamun", "deoksu"]
+  }
+]

@@ -1,0 +1,41 @@
+{
+  "name": "div4u-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Seoul Congestion Service",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "node -e \"const fs=require('fs'); const path=require('path'); if(!fs.existsSync('dist/data')) fs.mkdirSync('dist/data', {recursive:true}); if(fs.existsSync('src/data/seoulPlaces.json')) fs.copyFileSync('src/data/seoulPlaces.json', 'dist/data/seoulPlaces.json'); console.log('Assets copied');\"",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:api": "ts-node src/scripts/testSeoulAPI.ts",
+    "test:endpoints": "ts-node src/scripts/testAPI.ts",
+    "generate-data": "ts-node src/scripts/generateSeoulPlacesData.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "axios": "^1.6.2",
+    "xml2js": "^0.6.2",
+    "dotenv": "^16.3.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/morgan": "^1.9.9",
+    "@types/xml2js": "^0.4.14",
+    "@types/node": "^20.9.0",
+    "@types/jest": "^29.5.8",
+    "@types/supertest": "^2.0.16",
+    "typescript": "^5.2.2",
+    "ts-node-dev": "^2.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "supertest": "^6.3.3"
+  }
+}
