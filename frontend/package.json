@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "vite preview --host 0.0.0.0 --port 5174",
+    "build:bff": "npm run build && npm run copy:server",
+    "copy:server": "cp server.js dist/ && cp package-bff.json dist/package.json",
+    "start": "node server.js",
+    "dev:bff": "npm run build && npm run start",
+    "start:vite": "vite preview --host 0.0.0.0 --port 5174",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest",
@@ -24,7 +28,9 @@
     "clsx": "^2.0.0",
     "tailwind-merge": "^2.0.0",
     "@radix-ui/react-slot": "^1.0.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
