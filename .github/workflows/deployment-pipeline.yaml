@@ -215,13 +215,16 @@ jobs:
           HIGH=0
           MEDIUM=0
           SERVICES=""
+          DETAILED_RESULTS=""
           
           for file in trivy-*-results.sarif; do
             if [ -f "$file" ]; then
               SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
               SERVICES="$SERVICES $SERVICE"
               
-              # Count vulnerabilities by severity
+              echo "\n=== Processing $SERVICE ==="
+              
+              # Count vulnerabilities by severity and extract details
               if command -v jq >/dev/null 2>&1; then
                 CRIT_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "error")] | length' "$file" 2>/dev/null || echo 0)
                 HIGH_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "warning")] | length' "$file" 2>/dev/null || echo 0)
@@ -230,6 +233,24 @@ jobs:
                 CRITICAL=$((CRITICAL + CRIT_COUNT))
                 HIGH=$((HIGH + HIGH_COUNT))
                 MEDIUM=$((MEDIUM + MED_COUNT))
+                
+                # Extract top vulnerabilities for each service
+                SERVICE_DETAILS="\n**🔍 $SERVICE Service:**\n"
+                
+                # Critical vulnerabilities
+                if [ "$CRIT_COUNT" -gt 0 ]; then
+                  CRIT_VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "error") | "- 🚨 " + (.ruleId // "Unknown") + ": " + (.message.text // "No description")' "$file" 2>/dev/null | head -3)
+                  SERVICE_DETAILS="${SERVICE_DETAILS}Critical ($CRIT_COUNT):\n$CRIT_VULNS\n"
+                fi
+                
+                # High vulnerabilities  
+                if [ "$HIGH_COUNT" -gt 0 ]; then
+                  HIGH_VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "warning") | "- ⚠️ " + (.ruleId // "Unknown") + ": " + (.message.text // "No description")' "$file" 2>/dev/null | head -3)
+                  SERVICE_DETAILS="${SERVICE_DETAILS}High ($HIGH_COUNT):\n$HIGH_VULNS\n"
+                fi
+                
+                # Add service details to overall results
+                DETAILED_RESULTS="${DETAILED_RESULTS}${SERVICE_DETAILS}"
               fi
             fi
           done
@@ -238,6 +259,12 @@ jobs:
           echo "high=$HIGH" >> $GITHUB_OUTPUT
           echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          
+          # Save detailed results to file for GitHub Issue
+          echo "$DETAILED_RESULTS" > detailed_results.txt
+          echo "detailed_results<<EOF" >> $GITHUB_OUTPUT
+          echo "$DETAILED_RESULTS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send Slack approval request
         uses: 8398a7/action-slack@v3
@@ -290,6 +317,11 @@ jobs:
                       "title": "📊 Security Report",
                       "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Detailed Results>",
                       "short": true
+                    },
+                    {
+                      "title": "🔍 Top Vulnerabilities",
+                      "value": "${{ steps.parse-results.outputs.detailed_results }}",
+                      "short": false
                     }
                   ],
                   "actions": [
@@ -316,6 +348,63 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create security vulnerability issues
+        if: steps.parse-results.outputs.critical > 0 || steps.parse-results.outputs.high > 0
+        run: |
+          echo "Creating security vulnerability issues..."
+          
+          for file in trivy-*-results.sarif; do
+            if [ -f "$file" ]; then
+              SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
+              
+              # Extract vulnerabilities for this service
+              VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "error" or .level == "warning") | 
+                "## " + (if .level == "error" then "🚨 Critical" else "⚠️ High" end) + ": " + (.ruleId // "Unknown") + "\n\n" +
+                "**Description:** " + (.message.text // "No description") + "\n\n" +
+                "**Location:** " + ((.locations[0].physicalLocation.artifactLocation.uri // "Unknown") + ":" + (.locations[0].physicalLocation.region.startLine // "0" | tostring)) + "\n\n" +
+                "**Severity:** " + (if .level == "error" then "Critical" else "High" end) + "\n\n---\n"' "$file" 2>/dev/null)
+              
+              if [ ! -z "$VULNS" ]; then
+                # Create issue for this service
+                ISSUE_BODY="# 🛡️ Security Vulnerabilities Found in $SERVICE Service
+          
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+          **Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          
+          ## 📋 Summary
+          This issue contains security vulnerabilities discovered during automated scanning.
+          
+          $VULNS
+          
+          ## 🔗 Related Links
+          - [Security Scan Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
+          - [Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          
+          ## 🏷️ Labels
+          - security
+          - vulnerability
+          - $SERVICE
+          
+          **Please review and address these vulnerabilities before deployment.**"
+                
+                # Create GitHub issue
+                curl -X POST \
+                  -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  "${{ github.api_url }}/repos/${{ github.repository }}/issues" \
+                  -d "{
+                    \"title\": \"🛡️ Security Vulnerabilities in $SERVICE Service - ${{ github.ref_name }}\",
+                    \"body\": $(echo "$ISSUE_BODY" | jq -Rs .),
+                    \"labels\": [\"security\", \"vulnerability\", \"$SERVICE\"]
+                  }"
+                
+                echo "Created security issue for $SERVICE service"
+              fi
+            fi
+          done
 
       - name: Set approvers
         id: set-approvers
@@ -346,12 +435,18 @@ jobs:
             - ⚠️ **High:** ${{ steps.parse-results.outputs.high }}
             - 📋 **Medium:** ${{ steps.parse-results.outputs.medium }}
             
-            ### 🔗 Quick Links
-            - [📊 Security Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            ### 🔍 Detailed Vulnerability Report
+            ${{ steps.parse-results.outputs.detailed_results }}
+            
+            ### 🔗 Additional Resources
+            - [📊 Full Security Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
             - [🛡️ Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
             - [📝 Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            - [🔍 Security Issues](https://github.com/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity+label%3Avulnerability) (Detailed vulnerability tracking)
             
             ---
+            
+            > **📝 Note:** Detailed security issues have been created for tracking and resolution.
             
             **✅ To approve:** Comment with `approved`, `approve`, `lgtm`, or `yes`  
             **❌ To reject:** Comment with `denied`, `deny`, `rejected`, or `no`
