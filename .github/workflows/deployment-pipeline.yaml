@@ -318,11 +318,7 @@ jobs:
                       "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Detailed Results>",
                       "short": true
                     },
-                    {
-                      "title": "🔍 Top Vulnerabilities",
-                      "value": "${{ steps.parse-results.outputs.detailed_results }}",
-                      "short": false
-                    }
+
                   ],
                   "actions": [
                     {
@@ -333,8 +329,8 @@ jobs:
                     },
                     {
                       "type": "button",
-                      "text": "📋 View Security Details",
-                      "url": "${{ github.server_url }}/${{ github.repository }}/security"
+                      "text": "📋 View Vulnerability Details",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity+label%3Avulnerability"
                     },
                     {
                       "type": "button",
