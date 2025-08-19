@@ -319,18 +319,12 @@ jobs:
       - name: Get repository collaborators
         id: get-collaborators
         run: |
-          # Get repository collaborators with admin permissions
+          # Get repository collaborators with admin/maintain permissions
           COLLABORATORS=$(curl -s \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "${{ github.api_url }}/repos/${{ github.repository }}/collaborators?permission=admin" \
             | jq -r '.[].login' | tr '\n' ',' | sed 's/,$//')
-          
-          # Fallback to repository owner if no collaborators found
-          if [ -z "$COLLABORATORS" ]; then
-            COLLABORATORS="${{ github.repository_owner }}"
-          fi
-          
           echo "Repository admins: $COLLABORATORS"
           echo "collaborators=$COLLABORATORS" >> $GITHUB_OUTPUT
 
@@ -364,7 +358,7 @@ jobs:
             **✅ To approve:** Comment with `approved`, `approve`, `lgtm`, or `yes`  
             **❌ To reject:** Comment with `denied`, `deny`, `rejected`, or `no`
             
-            **⏰ Manual approval required to proceed with deployment.**
+            **⏰ This approval will timeout in 60 minutes.**
 
   push-images:
     name: Push Images
