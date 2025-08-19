@@ -1,4 +1,4 @@
-# Multi-stage build for React app
+# Multi-stage build for React app with BFF
 
 # Stage 1: Build stage
 FROM node:18-alpine AS builder
@@ -9,7 +9,7 @@ WORKDIR /app
 # 패키지 파일 복사
 COPY package*.json ./
 
-# 의존성 설치
+# 의존성 설치 (개발 의존성 포함)
 RUN npm install
 
 # 소스 코드 복사
@@ -26,29 +26,42 @@ ENV VITE_COMPARISON_API_URL=$VITE_COMPARISON_API_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME
 ENV VITE_APP_VERSION=$VITE_APP_VERSION
 
-# 프로덕션 빌드
+# React 앱 빌드
 RUN npm run build
 
-# Stage 2: Production stage
-FROM nginx:alpine
+# BFF 서버 파일 준비
+RUN npm run copy:server
 
-# Nginx 설정 파일 복사
-COPY nginx.conf /etc/nginx/nginx.conf
+# Stage 2: BFF Runtime
+FROM node:18-alpine
 
-# 빌드된 파일을 Nginx 서빙 디렉토리로 복사
-COPY --from=builder /app/dist /usr/share/nginx/html
+# 작업 디렉토리 설정
+WORKDIR /app
 
-# Nginx 전체 권한 설정
-RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx && \
-    chown -R nginx:nginx /var/cache/nginx /var/run/nginx /var/log/nginx /etc/nginx /usr/share/nginx && \
-    chmod -R 755 /var/cache/nginx /var/run/nginx && \
-    touch /var/run/nginx.pid && \
-    chown nginx:nginx /var/run/nginx.pid
+# 빌드된 정적 파일들과 BFF 서버 파일 복사
+COPY --from=builder /app/dist ./dist
 
-# 포트 노출
-EXPOSE 80
+# BFF 런타임 의존성 설치
+RUN cd dist && npm install --only=production
 
-# root로 실행 (80 포트 사용을 위해)
+# 비root 사용자 생성 및 권한 설정
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 
-# Nginx 실행
-CMD ["nginx", "-g", "daemon off;"]
+# 비root 사용자로 전환
+USER nodejs
+
+# 포트 노출 (80 → 3000으로 변경)
+EXPOSE 3000
+
+# 환경변수 설정
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# 헬스체크 추가
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# BFF 서버 실행
+CMD ["node", "dist/server.js"]

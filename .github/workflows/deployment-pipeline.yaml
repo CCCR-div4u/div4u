@@ -57,10 +57,10 @@ jobs:
           cd frontend
           npm run lint || true
 
-      - name: Build frontend
+      - name: Build frontend (BFF)
         run: |
           cd frontend
-          npm run build
+          npm run build:bff
 
       - name: Install comparison dependencies
         run: |

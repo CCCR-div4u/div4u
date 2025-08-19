@@ -29,7 +29,7 @@ spec:
         image: harbor.bluesunnywings.com/div4u/div4u-frontend:3f817980ad1e03dc06fc0205b0e7caa3604c0521
         imagePullPolicy: Always
         ports:
-        - containerPort: 80
+        - containerPort: 3000
           name: http
         env:
         - name: NODE_ENV
@@ -37,6 +37,13 @@ spec:
             configMapKeyRef:
               name: app-config
               key: NODE_ENV
+        - name: PORT
+          value: "3000"
+        - name: BACKEND_SERVICE_URL
+          value: "http://div4u-backend-service:3001"
+        - name: COMPARISON_SERVICE_URL
+          value: "http://div4u-comparison-service:3002"
+        # Build-time 환경변수들 (Docker 빌드 시 사용)
         - name: VITE_API_BASE_URL
           valueFrom:
             configMapKeyRef:
@@ -57,10 +64,7 @@ spec:
             configMapKeyRef:
               name: app-config
               key: VITE_APP_VERSION
-        volumeMounts:
-        - name: nginx-config
-          mountPath: /etc/nginx/nginx.conf
-          subPath: nginx.conf
+        # BFF 방식에서는 nginx-config 불필요
         resources:
           requests:
             memory: "256Mi"
@@ -71,7 +75,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 80
+            port: 3000
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -79,20 +83,19 @@ spec:
         readinessProbe:
           httpGet:
             path: /health
-            port: 80
+            port: 3000
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
+          runAsNonRoot: true
+          runAsUser: 1001
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: false
-      volumes:
-      - name: nginx-config
-        configMap:
-          name: nginx-config
+      # BFF 방식에서는 nginx-config volume 불필요
       restartPolicy: Always
       securityContext:
-        fsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
