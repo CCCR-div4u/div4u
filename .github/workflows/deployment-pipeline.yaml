@@ -195,6 +195,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: write
     
     steps:
       - name: Checkout repository
@@ -316,40 +317,20 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Get repository collaborators
-        id: get-collaborators
+      - name: Set approvers
+        id: set-approvers
         run: |
-          # Get repository collaborators with admin permissions
-          echo "Fetching repository collaborators..."
-          API_RESPONSE=$(curl -s \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/collaborators?permission=admin")
+          # Use workflow actor as approver (simple and reliable)
+          APPROVERS="${{ github.actor }}"
           
-          echo "API Response: $API_RESPONSE"
-          
-          COLLABORATORS=$(echo "$API_RESPONSE" | jq -r '.[].login' 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo "")
-          
-          # Multiple fallback strategies
-          if [ -z "$COLLABORATORS" ] || [ "$COLLABORATORS" = "null" ]; then
-            echo "No admin collaborators found, trying repository owner..."
-            COLLABORATORS="${{ github.repository_owner }}"
-          fi
-          
-          # Final safety check
-          if [ -z "$COLLABORATORS" ] || [ "$COLLABORATORS" = "null" ]; then
-            echo "Repository owner also empty, using actor as fallback..."
-            COLLABORATORS="${{ github.actor }}"
-          fi
-          
-          echo "Final approvers: $COLLABORATORS"
-          echo "collaborators=$COLLABORATORS" >> $GITHUB_OUTPUT
+          echo "Setting approver: $APPROVERS"
+          echo "approvers=$APPROVERS" >> $GITHUB_OUTPUT
 
-      - name: Wait for approval from repository owners
+      - name: Wait for manual approval
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
-          approvers: ${{ steps.get-collaborators.outputs.collaborators }}
+          approvers: ${{ steps.set-approvers.outputs.approvers }}
           minimum-approvals: 1
           issue-title: "🔍 Security Review & Deployment Approval - ${{ github.ref_name }}"
           issue-body: |
