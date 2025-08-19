@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/CCCR-div4u/div4u2.git'
-    targetRevision: HEAD
+    repoURL: 'https://github.com/CCCR-div4u/div4u.git'
+    targetRevision: develop
     path: k8s/comparison
   destination:
     server: 'https://kubernetes.default.svc'
