@@ -19,7 +19,9 @@ console.log(`📡 Backend Service: ${BACKEND_SERVICE_URL}`);
 console.log(`📊 Comparison Service: ${COMPARISON_SERVICE_URL}`);
 
 // 정적 파일 서빙 (React 빌드 결과물)
-app.use(express.static(path.join(__dirname, 'dist')));
+// Docker 환경에서는 이미 dist 디렉터리 안에 있으므로 현재 디렉터리 사용
+const staticPath = process.env.NODE_ENV === 'production' ? __dirname : path.join(__dirname, 'dist');
+app.use(express.static(staticPath));
 
 // 헬스체크 엔드포인트 (Kubernetes용)
 app.get('/health', (req, res) => {
@@ -76,7 +78,10 @@ app.use('/api', createProxyMiddleware({
 app.get('*', (req, res) => {
   // API 경로가 아닌 경우에만 index.html 제공
   if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    const indexPath = process.env.NODE_ENV === 'production' 
+      ? path.join(__dirname, 'index.html')
+      : path.join(__dirname, 'dist', 'index.html');
+    res.sendFile(indexPath);
   } else {
     res.status(404).json({ error: 'API endpoint not found' });
   }
