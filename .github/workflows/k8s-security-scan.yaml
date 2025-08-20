@@ -669,43 +669,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Comment on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        env:
-          ANALYSIS_RESULT: ${{ steps.openai-analysis.outputs.analysis_result }}
-          ISSUE_COUNT: ${{ steps.openai-analysis.outputs.issue_count }}
-        with:
-          script: |
-            const analysis = process.env.ANALYSIS_RESULT;
-            const issueCount = process.env.ISSUE_COUNT || '0';
-            
-            let commentBody = `## 🔒 div4u Kubernetes 보안 검사 결과\n\n`;
-            
-            if (issueCount === '0') {
-              commentBody += `✅ **보안 검사 통과**\n\n`;
-              commentBody += `k8s 디렉터리의 모든 Kubernetes 매니페스트가 보안 검사를 통과했습니다.\n\n`;
-            } else {
-              commentBody += `⚠️ **보안 이슈 발견: ${issueCount}개**\n\n`;
-              commentBody += `${analysis}\n\n`;
-              commentBody += `### 📋 다음 단계\n`;
-              commentBody += `1. 발견된 보안 이슈를 검토하고 수정해주세요\n`;
-              commentBody += `2. 수정 후 다시 커밋하면 자동으로 재검사됩니다\n`;
-              commentBody += `3. 모든 이슈 해결 후 PR을 머지해주세요\n\n`;
-            }
-            
-            commentBody += `### 🔗 상세 정보\n`;
-            commentBody += `- [워크플로우 실행 결과](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
-            commentBody += `- [보안 검사 아티팩트 다운로드](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)\n\n`;
-            commentBody += `*🤖 자동 생성된 보안 검사 결과입니다.*`;
-            
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: commentBody
-            });
-
   # 변경사항이 없을 때 빠른 종료
   no-changes:
     needs: detect-changes
