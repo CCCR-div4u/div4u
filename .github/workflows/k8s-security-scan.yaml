@@ -536,26 +536,34 @@ jobs:
             COLOR="good"
           fi
           
-          # Slack 메시지 생성 (Python을 사용한 안전한 JSON 생성)
-          export HEADER_EMOJI="$HEADER_EMOJI"
-          export MESSAGE_TEXT="$MESSAGE_TEXT"
-          export BUTTON_TEXT="$BUTTON_TEXT"
-          export LINK_URL="$LINK_URL"
-          export COLOR="$COLOR"
-          
-          python3 << 'PYTHON_EOF'
+          python3 << 'EOF'
           import json
           import os
+          import urllib.request
+          import urllib.parse
           
           # 환경 변수에서 값 읽기
-          header_emoji = os.environ.get('HEADER_EMOJI', '🔒')
+          webhook_url = os.environ.get('SLACK_WEBHOOK_URL_CHECKOV')
           issue_count = os.environ.get('ISSUE_COUNT', '0')
           scan_reason = os.environ.get('SCAN_REASON', 'Unknown')
+          issue_url = os.environ.get('ISSUE_URL', '')
           branch_name = os.environ.get('GITHUB_REF_NAME', 'unknown')
-          message_text = os.environ.get('MESSAGE_TEXT', 'Security scan completed')
-          button_text = os.environ.get('BUTTON_TEXT', 'View Details')
-          link_url = os.environ.get('LINK_URL', '#')
-          color = os.environ.get('COLOR', 'good')
+          
+          # 보안 이슈 유무에 따른 메시지 설정
+          if issue_count != "0" and issue_url:
+              # 보안 이슈가 있는 경우
+              header_emoji = "🚨"
+              message_text = f"div4u K8s 보안 검사 완료\\n보안 이슈 {issue_count}개가 발견되었습니다.\\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
+              button_text = "보안 이슈 확인"
+              link_url = issue_url
+              color = "danger"
+          else:
+              # 보안 이슈가 없는 경우
+              header_emoji = "✅"
+              message_text = "div4u K8s 보안 검사 완료\\n보안 이슈가 발견되지 않았습니다.\\n모든 보안 검사를 통과했습니다."
+              button_text = "워크플로우 보기"
+              link_url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
+              color = "good"
           
           # Slack 메시지 구조 생성
           slack_message = {
@@ -613,23 +621,31 @@ jobs:
               ]
           }
           
-          # JSON 파일로 저장
-          with open('slack_message.json', 'w', encoding='utf-8') as f:
-              json.dump(slack_message, f, ensure_ascii=False, indent=2)
-          
-          print("✅ Slack 메시지 JSON 생성 완료")
-          PYTHON_EOF
-          
           # Slack 웹훅으로 전송
-          if curl -X POST -H 'Content-type: application/json' \
-            --data @slack_message.json \
-            "$SLACK_WEBHOOK_URL_CHECKOV"; then
-            echo "✅ Slack 알림 전송 완료"
-            if [ "$ISSUE_COUNT" != "0" ] && [ -n "$ISSUE_URL" ]; then
-              echo "🔗 Issue 링크: $ISSUE_URL"
-            else
-              echo "✅ 보안 이슈 없음"
-            fi
+          try:
+              data = json.dumps(slack_message).encode('utf-8')
+              req = urllib.request.Request(
+                  webhook_url,
+                  data=data,
+                  headers={'Content-Type': 'application/json'}
+              )
+              
+              with urllib.request.urlopen(req) as response:
+                  if response.status == 200:
+                      print("✅ Slack 알림 전송 완료")
+                      if issue_count != "0" and issue_url:
+                          print(f"🔗 Issue 링크: {issue_url}")
+                      else:
+                          print("✅ 보안 이슈 없음")
+                  else:
+                      print(f"❌ Slack 알림 전송 실패: HTTP {response.status}")
+                      
+          except Exception as e:
+              print(f"❌ Slack 알림 전송 실패: {e}")
+          EOF
+          else
+            echo "❌ Slack 알림 전송 실패"
+          fi
       - name: Upload SARIF to GitHub Security
         if: always() && (github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false))
         uses: github/codeql-action/upload-sarif@v3
