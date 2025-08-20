@@ -522,87 +522,103 @@ jobs:
           # 보안 이슈 유무에 따른 메시지 설정
           if [ "$ISSUE_COUNT" != "0" ] && [ -n "$ISSUE_URL" ]; then
             # 보안 이슈가 있는 경우
-            MESSAGE_TEXT="🚨 div4u K8s 보안 검사 완료\\n보안 이슈 ${ISSUE_COUNT}개가 발견되었습니다.\\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
+            MESSAGE_TEXT="div4u K8s 보안 검사 완료\\n보안 이슈 ${ISSUE_COUNT}개가 발견되었습니다.\\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
             BUTTON_TEXT="보안 이슈 확인"
             LINK_URL="$ISSUE_URL"
             HEADER_EMOJI="🚨"
             COLOR="danger"
           else
             # 보안 이슈가 없는 경우
-            MESSAGE_TEXT="✅ div4u K8s 보안 검사 완료\\n보안 이슈가 발견되지 않았습니다.\\n모든 보안 검사를 통과했습니다."
+            MESSAGE_TEXT="div4u K8s 보안 검사 완료\\n보안 이슈가 발견되지 않았습니다.\\n모든 보안 검사를 통과했습니다."
             BUTTON_TEXT="워크플로우 보기"
             LINK_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             HEADER_EMOJI="✅"
             COLOR="good"
           fi
           
-          # Slack 메시지 생성 (JSON 이스케이프 처리)
-          cat > slack_message.json << 'EOF'
-          {
-            "text": "🔒 div4u Kubernetes 보안 검사 결과",
-            "blocks": [
-              {
-                "type": "header",
-                "text": {
-                  "type": "plain_text",
-                  "text": "HEADER_EMOJI_PLACEHOLDER div4u K8s 보안 검사 결과"
-                }
-              },
-              {
-                "type": "section",
-                "fields": [
-                  {
-                    "type": "mrkdwn",
-                    "text": "*프로젝트:* div4u"
-                  },
-                  {
-                    "type": "mrkdwn", 
-                    "text": "*발견된 이슈:* ISSUE_COUNT_PLACEHOLDER개"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*실행 이유:* SCAN_REASON_PLACEHOLDER"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*브랜치:* \`BRANCH_PLACEHOLDER\`"
-                  }
-                ]
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "MESSAGE_TEXT_PLACEHOLDER"
-                }
-              },
-              {
-                "type": "actions",
-                "elements": [
-                  {
-                    "type": "button",
-                    "text": {
-                      "type": "plain_text",
-                      "text": "BUTTON_TEXT_PLACEHOLDER"
-                    },
-                    "url": "LINK_URL_PLACEHOLDER",
-                    "style": "COLOR_PLACEHOLDER"
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
+          # Slack 메시지 생성 (Python을 사용한 안전한 JSON 생성)
+          export HEADER_EMOJI="$HEADER_EMOJI"
+          export MESSAGE_TEXT="$MESSAGE_TEXT"
+          export BUTTON_TEXT="$BUTTON_TEXT"
+          export LINK_URL="$LINK_URL"
+          export COLOR="$COLOR"
           
-          # 플레이스홀더를 실제 값으로 치환
-          sed -i "s/HEADER_EMOJI_PLACEHOLDER/$HEADER_EMOJI/g" slack_message.json
-          sed -i "s/ISSUE_COUNT_PLACEHOLDER/${ISSUE_COUNT:-0}/g" slack_message.json
-          sed -i "s/SCAN_REASON_PLACEHOLDER/$SCAN_REASON/g" slack_message.json
-          sed -i "s/BRANCH_PLACEHOLDER/${{ github.ref_name }}/g" slack_message.json
-          sed -i "s/MESSAGE_TEXT_PLACEHOLDER/$MESSAGE_TEXT/g" slack_message.json
-          sed -i "s/BUTTON_TEXT_PLACEHOLDER/$BUTTON_TEXT/g" slack_message.json
-          sed -i "s|LINK_URL_PLACEHOLDER|$LINK_URL|g" slack_message.json
-          sed -i "s/COLOR_PLACEHOLDER/$COLOR/g" slack_message.json
+          python3 << 'PYTHON_EOF'
+          import json
+          import os
+          
+          # 환경 변수에서 값 읽기
+          header_emoji = os.environ.get('HEADER_EMOJI', '🔒')
+          issue_count = os.environ.get('ISSUE_COUNT', '0')
+          scan_reason = os.environ.get('SCAN_REASON', 'Unknown')
+          branch_name = os.environ.get('GITHUB_REF_NAME', 'unknown')
+          message_text = os.environ.get('MESSAGE_TEXT', 'Security scan completed')
+          button_text = os.environ.get('BUTTON_TEXT', 'View Details')
+          link_url = os.environ.get('LINK_URL', '#')
+          color = os.environ.get('COLOR', 'good')
+          
+          # Slack 메시지 구조 생성
+          slack_message = {
+              "text": "🔒 div4u Kubernetes 보안 검사 결과",
+              "blocks": [
+                  {
+                      "type": "header",
+                      "text": {
+                          "type": "plain_text",
+                          "text": f"{header_emoji} div4u K8s 보안 검사 결과"
+                      }
+                  },
+                  {
+                      "type": "section",
+                      "fields": [
+                          {
+                              "type": "mrkdwn",
+                              "text": "*프로젝트:* div4u"
+                          },
+                          {
+                              "type": "mrkdwn", 
+                              "text": f"*발견된 이슈:* {issue_count}개"
+                          },
+                          {
+                              "type": "mrkdwn",
+                              "text": f"*실행 이유:* {scan_reason}"
+                          },
+                          {
+                              "type": "mrkdwn",
+                              "text": f"*브랜치:* `{branch_name}`"
+                          }
+                      ]
+                  },
+                  {
+                      "type": "section",
+                      "text": {
+                          "type": "mrkdwn",
+                          "text": message_text.replace('\\n', '\n')
+                      }
+                  },
+                  {
+                      "type": "actions",
+                      "elements": [
+                          {
+                              "type": "button",
+                              "text": {
+                                  "type": "plain_text",
+                                  "text": button_text
+                              },
+                              "url": link_url,
+                              "style": color
+                          }
+                      ]
+                  }
+              ]
+          }
+          
+          # JSON 파일로 저장
+          with open('slack_message.json', 'w', encoding='utf-8') as f:
+              json.dump(slack_message, f, ensure_ascii=False, indent=2)
+          
+          print("✅ Slack 메시지 JSON 생성 완료")
+          PYTHON_EOF
           
           # Slack 웹훅으로 전송
           if curl -X POST -H 'Content-type: application/json' \
