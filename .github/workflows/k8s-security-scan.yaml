@@ -446,12 +446,12 @@ jobs:
       - name: Send Slack notification
         if: always()
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL_CHECKOV: ${{ secrets.SLACK_WEBHOOK_URL_CHECKOV }}
         run: |
-          if [ -f "reports/slack-message.json" ] && [ -n "$SLACK_WEBHOOK_URL" ]; then
+          if [ -f "reports/slack-message.json" ] && [ -n "$SLACK_WEBHOOK_URL_CHECKOV" ]; then
             curl -X POST -H 'Content-type: application/json' \
               --data @reports/slack-message.json \
-              "$SLACK_WEBHOOK_URL"
+              "$SLACK_WEBHOOK_URL_CHECKOV"
             echo "Slack notification sent"
           else
             echo "Slack webhook URL not configured or message file not found"
