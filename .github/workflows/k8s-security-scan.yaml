@@ -1,19 +1,28 @@
 name: Kubernetes Security Scan
 
 on:
-  push:
-    branches: [main, develop, 'feature/k8s-security-scan']
-    paths:
-      - 'k8s/**'
-      - '.github/workflows/k8s-security-scan.yaml'
+  # PR 생성/업데이트 시 실행
   pull_request:
     branches: [main, develop]
     paths:
       - 'k8s/**'
       - '.github/workflows/k8s-security-scan.yaml'
+  # 메인 브랜치 직접 push 시 실행
+  push:
+    branches: [main, develop]
+    paths:
+      - 'k8s/**'
+      - '.github/workflows/k8s-security-scan.yaml'
+  # 테스트용 feature 브랜치 (테스트 완료 후 제거 예정)
+  push:
+    branches: ['feature/k8s-security-scan']
+    paths:
+      - 'k8s/**'
+      - '.github/workflows/k8s-security-scan.yaml'
+  # 수동 실행
   workflow_dispatch:
+  # 정기 스캔 (매일 오전 9시 UTC)
   schedule:
-    # 매일 오전 9시 UTC에 정기 스캔 (main 브랜치에서만)
     - cron: '0 9 * * *'
 
 permissions:
@@ -23,7 +32,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: k8s-security-${{ github.ref }}
+  group: k8s-security-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
