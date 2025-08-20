@@ -2,7 +2,7 @@ name: Kubernetes Security Scan
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'feature/k8s-security-scan']
     paths:
       - 'k8s/**'
       - '.github/workflows/k8s-security-scan.yaml'
@@ -13,7 +13,7 @@ on:
       - '.github/workflows/k8s-security-scan.yaml'
   workflow_dispatch:
   schedule:
-    # 매일 오전 9시 UTC에 정기 스캔
+    # 매일 오전 9시 UTC에 정기 스캔 (main 브랜치에서만)
     - cron: '0 9 * * *'
 
 permissions:
@@ -181,24 +181,7 @@ jobs:
           else
             echo "⚠️ SARIF 생성 실패, 기본 SARIF 파일 생성"
             # 기본 SARIF 구조 생성
-            cat > reports/checkov-results.sarif << 'SARIF_EOF'
-{
-  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-  "version": "2.1.0",
-  "runs": [
-    {
-      "tool": {
-        "driver": {
-          "name": "Checkov",
-          "version": "3.2.464",
-          "informationUri": "https://checkov.io/"
-        }
-      },
-      "results": []
-    }
-  ]
-}
-SARIF_EOF
+            echo '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"Checkov","version":"3.2.464","informationUri":"https://checkov.io/"}},"results":[]}]}' > reports/checkov-results.sarif
           fi
           
       - name: Analyze security results with OpenAI
