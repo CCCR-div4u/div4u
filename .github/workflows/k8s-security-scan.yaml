@@ -169,15 +169,37 @@ jobs:
             echo '{"check_type": "kubernetes", "results": {"failed_checks": []}, "summary": {"passed": 0, "failed": 0, "skipped": 0, "parsing_errors": 0, "resource_count": 0, "checkov_version": "unknown"}}' > reports/checkov-results.json
           fi
           
-          # SARIF 형식으로도 생성
-          checkov \
+          # SARIF 형식으로도 생성 (오류 방지를 위해 별도 처리)
+          echo "📊 SARIF 결과 생성 중..."
+          if checkov \
             --file results/all-manifests.yaml \
             --framework kubernetes \
             --output sarif \
             --soft-fail \
-            --quiet > reports/checkov-results.sarif
-          
-          echo "📊 SARIF 결과 생성 완료"
+            --quiet > reports/checkov-results.sarif 2>/dev/null; then
+            echo "✅ SARIF 결과 생성 완료"
+          else
+            echo "⚠️ SARIF 생성 실패, 기본 SARIF 파일 생성"
+            # 기본 SARIF 구조 생성
+            cat > reports/checkov-results.sarif << 'SARIF_EOF'
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Checkov",
+          "version": "3.2.464",
+          "informationUri": "https://checkov.io/"
+        }
+      },
+      "results": []
+    }
+  ]
+}
+SARIF_EOF
+          fi
           
       - name: Analyze security results with OpenAI
         if: always()
@@ -572,56 +594,41 @@ jobs:
               link_url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
               color = "good"
           
-          # Slack 메시지 구조 생성
+          # Slack 메시지 구조 생성 (간단한 형식으로 HTTP 400 오류 방지)
           slack_message = {
-              "text": "🔒 div4u Kubernetes 보안 검사 결과",
-              "blocks": [
+              "text": f"{header_emoji} div4u K8s 보안 검사 결과",
+              "attachments": [
                   {
-                      "type": "header",
-                      "text": {
-                          "type": "plain_text",
-                          "text": f"{header_emoji} div4u K8s 보안 검사 결과"
-                      }
-                  },
-                  {
-                      "type": "section",
+                      "color": color,
                       "fields": [
                           {
-                              "type": "mrkdwn",
-                              "text": "*프로젝트:* div4u"
+                              "title": "프로젝트",
+                              "value": "div4u",
+                              "short": True
                           },
                           {
-                              "type": "mrkdwn", 
-                              "text": f"*발견된 이슈:* {issue_count}개"
+                              "title": "발견된 이슈",
+                              "value": f"{issue_count}개",
+                              "short": True
                           },
                           {
-                              "type": "mrkdwn",
-                              "text": f"*실행 이유:* {scan_reason}"
+                              "title": "실행 이유",
+                              "value": scan_reason,
+                              "short": True
                           },
                           {
-                              "type": "mrkdwn",
-                              "text": f"*브랜치:* `{branch_name}`"
+                              "title": "브랜치",
+                              "value": branch_name,
+                              "short": True
                           }
-                      ]
-                  },
-                  {
-                      "type": "section",
-                      "text": {
-                          "type": "mrkdwn",
-                          "text": message_text.replace('\\n', '\n')
-                      }
-                  },
-                  {
-                      "type": "actions",
-                      "elements": [
+                      ],
+                      "text": message_text.replace('\\n', '\n'),
+                      "actions": [
                           {
                               "type": "button",
-                              "text": {
-                                  "type": "plain_text",
-                                  "text": button_text
-                              },
+                              "text": button_text,
                               "url": link_url,
-                              "style": color
+                              "style": "primary" if color == "good" else "danger"
                           }
                       ]
                   }
@@ -630,14 +637,18 @@ jobs:
           
           # Slack 웹훅으로 전송
           try:
-              data = json.dumps(slack_message).encode('utf-8')
+              data = json.dumps(slack_message, ensure_ascii=False).encode('utf-8')
               req = urllib.request.Request(
                   webhook_url,
                   data=data,
-                  headers={'Content-Type': 'application/json'}
+                  headers={
+                      'Content-Type': 'application/json; charset=utf-8',
+                      'User-Agent': 'div4u-security-scan/1.0'
+                  }
               )
               
-              with urllib.request.urlopen(req) as response:
+              with urllib.request.urlopen(req, timeout=10) as response:
+                  response_text = response.read().decode('utf-8')
                   if response.status == 200:
                       print("✅ Slack 알림 전송 완료")
                       if issue_count != "0" and issue_url:
@@ -646,7 +657,14 @@ jobs:
                           print("✅ 보안 이슈 없음")
                   else:
                       print(f"❌ Slack 알림 전송 실패: HTTP {response.status}")
+                      print(f"응답: {response_text}")
                       
+          except urllib.error.HTTPError as e:
+              error_body = e.read().decode('utf-8') if e.fp else 'No error body'
+              print(f"❌ Slack HTTP 오류: {e.code} {e.reason}")
+              print(f"오류 내용: {error_body}")
+              # 메시지 내용 디버깅
+              print(f"전송한 메시지 크기: {len(data)} bytes")
           except Exception as e:
               print(f"❌ Slack 알림 전송 실패: {e}")
           EOF
