@@ -380,34 +380,66 @@ jobs:
           cat analysis_result.txt >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
-          # 이슈 개수 확인
+          # 이슈 개수 확인 및 디버깅
+          echo "🔍 JSON 파일 내용 확인:"
+          echo "파일 크기: $(wc -c < $JSON_FILE) bytes"
+          echo "첫 200자: $(head -c 200 $JSON_FILE)"
+          
           ISSUE_COUNT=$(python3 -c "
           import json
           try:
               with open('$JSON_FILE', 'r') as f:
                   data = json.load(f)
+              print('JSON 로드 성공')
+              print('전체 구조:', list(data.keys()))
+              
+              # Checkov 결과 구조 확인
+              if 'results' in data:
+                  results = data['results']
+                  print('results 키 존재')
+                  if 'failed_checks' in results:
+                      failed_checks = results['failed_checks']
+                      print(f'failed_checks 개수: {len(failed_checks)}')
+                      print(failed_checks)
+                  else:
+                      print('failed_checks 키 없음, results 구조:', list(results.keys()))
+              else:
+                  print('results 키 없음, 전체 구조:', data)
+              
+              # 실패한 검사 개수 추출
               failed_checks = data.get('results', {}).get('failed_checks', [])
-              print(len(failed_checks))
-          except:
+              count = len(failed_checks)
+              print(f'최종 이슈 개수: {count}')
+              print(count)
+          except Exception as e:
+              print(f'오류 발생: {e}')
               print(0)
           ")
           
+          echo "🔢 추출된 이슈 개수: $ISSUE_COUNT"
+          echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
+          
       - name: Create GitHub Issue for security findings
-        if: always() && steps.openai-analysis.outputs.issue_count != '0'
+        if: always()
         id: create-issue
         uses: actions/github-script@v7
         env:
           ANALYSIS_RESULT: ${{ steps.openai-analysis.outputs.analysis_result }}
+          ISSUE_COUNT: ${{ steps.openai-analysis.outputs.issue_count }}
           SCAN_REASON: ${{ needs.detect-changes.outputs.scan_reason }}
         with:
           script: |
-            const analysis = process.env.ANALYSIS_RESULT;
-            const issueCount = '${{ steps.openai-analysis.outputs.issue_count }}';
-            const scanReason = process.env.SCAN_REASON;
+            const analysis = process.env.ANALYSIS_RESULT || '분석 결과를 가져올 수 없습니다.';
+            const issueCount = process.env.ISSUE_COUNT || '0';
+            const scanReason = process.env.SCAN_REASON || 'Unknown';
             
-            console.log(`🔍 Issue 생성 시작: div4u k8s 보안 검사 (${issueCount}개 이슈)`);
+            console.log(`🔍 Issue 생성 확인: 이슈 개수 = "${issueCount}"`);
+            console.log(`🔍 이슈 개수 타입: ${typeof issueCount}`);
+            console.log(`🔍 이슈 개수 != '0': ${issueCount !== '0'}`);
+            console.log(`🔍 이슈 개수 > 0: ${parseInt(issueCount) > 0}`);
             
-            if (issueCount && issueCount !== '0') {
+            // 보안 이슈가 있는 경우에만 Issue 생성
+            if (issueCount && issueCount !== '0' && parseInt(issueCount) > 0) {
               // 심각도별 이슈 개수 분석
               const fs = require('fs');
               let criticalCount = 0;
