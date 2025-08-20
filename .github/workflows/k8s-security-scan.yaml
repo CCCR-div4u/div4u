@@ -109,6 +109,21 @@ jobs:
           echo "🌿 브랜치: ${{ github.ref_name }}"
           echo "📝 커밋: ${{ github.sha }}"
           echo ""
+          echo "📋 현재 k8s 디렉터리 파일 목록:"
+          ls -la k8s/
+          echo ""
+          echo "🔍 취약한 테스트 파일 확인:"
+          if [ -f "k8s/test-vulnerable-deployment.yaml" ]; then
+            echo "✅ test-vulnerable-deployment.yaml 존재 ($(wc -c < k8s/test-vulnerable-deployment.yaml) bytes)"
+          else
+            echo "❌ test-vulnerable-deployment.yaml 없음"
+          fi
+          if [ -f "k8s/test-insecure-pod.yaml" ]; then
+            echo "✅ test-insecure-pod.yaml 존재 ($(wc -c < k8s/test-insecure-pod.yaml) bytes)"
+          else
+            echo "❌ test-insecure-pod.yaml 없음"
+          fi
+          echo ""
           echo "::notice::${{ needs.detect-changes.outputs.scan_reason }}으로 인한 보안 검사 실행"
 
       - name: Create directories
@@ -169,20 +184,7 @@ jobs:
             echo '{"check_type": "kubernetes", "results": {"failed_checks": []}, "summary": {"passed": 0, "failed": 0, "skipped": 0, "parsing_errors": 0, "resource_count": 0, "checkov_version": "unknown"}}' > reports/checkov-results.json
           fi
           
-          # SARIF 형식으로도 생성 (오류 방지를 위해 별도 처리)
-          echo "📊 SARIF 결과 생성 중..."
-          if checkov \
-            --file results/all-manifests.yaml \
-            --framework kubernetes \
-            --output sarif \
-            --soft-fail \
-            --quiet > reports/checkov-results.sarif 2>/dev/null; then
-            echo "✅ SARIF 결과 생성 완료"
-          else
-            echo "⚠️ SARIF 생성 실패, 기본 SARIF 파일 생성"
-            # 기본 SARIF 구조 생성
-            echo '{"$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"Checkov","version":"3.2.464","informationUri":"https://checkov.io/"}},"results":[]}]}' > reports/checkov-results.sarif
-          fi
+          echo "📊 JSON 결과 생성 완료"
           
       - name: Analyze security results with OpenAI
         if: always()
@@ -652,7 +654,7 @@ jobs:
               print(f"❌ Slack 알림 전송 실패: {e}")
           EOF
       - name: Upload SARIF to GitHub Security
-        if: always() && (github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false))
+        if: false  # SARIF 오류로 인해 임시 비활성화
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: reports/checkov-results.sarif
