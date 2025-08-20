@@ -7,15 +7,9 @@ on:
     paths:
       - 'k8s/**'
       - '.github/workflows/k8s-security-scan.yaml'
-  # 메인 브랜치 직접 push 시 실행
+  # 브랜치 push 시 실행 (메인 브랜치 + 테스트용 feature 브랜치)
   push:
-    branches: [main, develop]
-    paths:
-      - 'k8s/**'
-      - '.github/workflows/k8s-security-scan.yaml'
-  # 테스트용 feature 브랜치 (테스트 완료 후 제거 예정)
-  push:
-    branches: ['feature/k8s-security-scan']
+    branches: [main, develop, 'feature/k8s-security-scan']
     paths:
       - 'k8s/**'
       - '.github/workflows/k8s-security-scan.yaml'
