@@ -522,22 +522,22 @@ jobs:
           # 보안 이슈 유무에 따른 메시지 설정
           if [ "$ISSUE_COUNT" != "0" ] && [ -n "$ISSUE_URL" ]; then
             # 보안 이슈가 있는 경우
-            MESSAGE_TEXT="🚨 *div4u K8s 보안 검사 완료*\n보안 이슈 ${ISSUE_COUNT}개가 발견되었습니다.\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
+            MESSAGE_TEXT="🚨 div4u K8s 보안 검사 완료\\n보안 이슈 ${ISSUE_COUNT}개가 발견되었습니다.\\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
             BUTTON_TEXT="보안 이슈 확인"
             LINK_URL="$ISSUE_URL"
             HEADER_EMOJI="🚨"
             COLOR="danger"
           else
             # 보안 이슈가 없는 경우
-            MESSAGE_TEXT="✅ *div4u K8s 보안 검사 완료*\n보안 이슈가 발견되지 않았습니다.\n모든 보안 검사를 통과했습니다."
+            MESSAGE_TEXT="✅ div4u K8s 보안 검사 완료\\n보안 이슈가 발견되지 않았습니다.\\n모든 보안 검사를 통과했습니다."
             BUTTON_TEXT="워크플로우 보기"
             LINK_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             HEADER_EMOJI="✅"
             COLOR="good"
           fi
           
-          # Slack 메시지 생성
-          cat > slack_message.json << EOF
+          # Slack 메시지 생성 (JSON 이스케이프 처리)
+          cat > slack_message.json << 'EOF'
           {
             "text": "🔒 div4u Kubernetes 보안 검사 결과",
             "blocks": [
@@ -545,7 +545,7 @@ jobs:
                 "type": "header",
                 "text": {
                   "type": "plain_text",
-                  "text": "${HEADER_EMOJI} div4u K8s 보안 검사 결과"
+                  "text": "HEADER_EMOJI_PLACEHOLDER div4u K8s 보안 검사 결과"
                 }
               },
               {
@@ -557,15 +557,15 @@ jobs:
                   },
                   {
                     "type": "mrkdwn", 
-                    "text": "*발견된 이슈:* ${ISSUE_COUNT:-0}개"
+                    "text": "*발견된 이슈:* ISSUE_COUNT_PLACEHOLDER개"
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*실행 이유:* ${SCAN_REASON}"
+                    "text": "*실행 이유:* SCAN_REASON_PLACEHOLDER"
                   },
                   {
                     "type": "mrkdwn",
-                    "text": "*브랜치:* \`${{ github.ref_name }}\`"
+                    "text": "*브랜치:* \`BRANCH_PLACEHOLDER\`"
                   }
                 ]
               },
@@ -573,7 +573,7 @@ jobs:
                 "type": "section",
                 "text": {
                   "type": "mrkdwn",
-                  "text": "${MESSAGE_TEXT}"
+                  "text": "MESSAGE_TEXT_PLACEHOLDER"
                 }
               },
               {
@@ -583,16 +583,26 @@ jobs:
                     "type": "button",
                     "text": {
                       "type": "plain_text",
-                      "text": "${BUTTON_TEXT}"
+                      "text": "BUTTON_TEXT_PLACEHOLDER"
                     },
-                    "url": "${LINK_URL}",
-                    "style": "${COLOR}"
+                    "url": "LINK_URL_PLACEHOLDER",
+                    "style": "COLOR_PLACEHOLDER"
                   }
                 ]
               }
             ]
           }
           EOF
+          
+          # 플레이스홀더를 실제 값으로 치환
+          sed -i "s/HEADER_EMOJI_PLACEHOLDER/$HEADER_EMOJI/g" slack_message.json
+          sed -i "s/ISSUE_COUNT_PLACEHOLDER/${ISSUE_COUNT:-0}/g" slack_message.json
+          sed -i "s/SCAN_REASON_PLACEHOLDER/$SCAN_REASON/g" slack_message.json
+          sed -i "s/BRANCH_PLACEHOLDER/${{ github.ref_name }}/g" slack_message.json
+          sed -i "s/MESSAGE_TEXT_PLACEHOLDER/$MESSAGE_TEXT/g" slack_message.json
+          sed -i "s/BUTTON_TEXT_PLACEHOLDER/$BUTTON_TEXT/g" slack_message.json
+          sed -i "s|LINK_URL_PLACEHOLDER|$LINK_URL|g" slack_message.json
+          sed -i "s/COLOR_PLACEHOLDER/$COLOR/g" slack_message.json
           
           # Slack 웹훅으로 전송
           if curl -X POST -H 'Content-type: application/json' \
