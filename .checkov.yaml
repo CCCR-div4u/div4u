@@ -1,0 +1,70 @@
+# Checkov Configuration for div4u Kubernetes Security Scanning
+
+# 검사할 프레임워크 지정
+framework:
+  - kubernetes
+
+# 검사 제외할 디렉터리
+skip-path:
+  - .git/
+  - node_modules/
+  - .github/
+  - generated-diagrams/
+
+# 특정 검사 규칙 건너뛰기 (필요시 주석 해제)
+# skip-check:
+#   - CKV_K8S_43  # Image should use digest
+#   - CKV_K8S_35  # Prefer using secrets as files over secrets as environment variables
+
+# 심각도 필터 (기본값: 모든 심각도 포함)
+# severity:
+#   - CRITICAL
+#   - HIGH
+#   - MEDIUM
+
+# 출력 형식
+output:
+  - cli
+  - json
+  - sarif
+
+# 소프트 실패 모드 (검사 실패 시에도 워크플로우 계속 진행)
+soft-fail: true
+
+# 컴팩트 출력
+compact: true
+
+# 조용한 모드
+quiet: false
+
+# 다운로드 외부 모듈 허용
+download-external-modules: false
+
+# 평가할 변수 파일
+# var-file:
+#   - terraform.tfvars
+
+# 커스텀 검사 디렉터리
+# external-checks-dir:
+#   - /path/to/custom/checks
+
+# 베이스라인 파일 (첫 실행 후 생성됨)
+# baseline: .checkov.baseline
+
+# 검사 결과 캐시 사용
+# use-enforcement-rules: true
+
+# 리포트에 포함할 추가 정보
+include-all-checkov-policies: true
+
+# 수정 제안 포함
+# enable-secret-scan-all-files: false
+
+# 로그 레벨
+log-level: INFO
+
+# 병렬 실행 워커 수
+# parallel: 4
+
+# 타임아웃 설정 (초)
+# timeout: 3600
