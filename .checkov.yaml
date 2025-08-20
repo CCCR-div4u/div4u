@@ -60,9 +60,6 @@ include-all-checkov-policies: true
 # 수정 제안 포함
 # enable-secret-scan-all-files: false
 
-# 로그 레벨
-log-level: INFO
-
 # 병렬 실행 워커 수
 # parallel: 4
 

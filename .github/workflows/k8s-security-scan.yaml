@@ -56,9 +56,7 @@ jobs:
             --framework kubernetes \
             --output json \
             --output-file-path reports/checkov-results.json \
-            --soft-fail \
-            --compact \
-            --quiet
+            --soft-fail
         continue-on-error: true
 
       - name: Generate SARIF report for GitHub Security
@@ -68,9 +66,7 @@ jobs:
             --framework kubernetes \
             --output sarif \
             --output-file-path reports/checkov-results.sarif \
-            --soft-fail \
-            --compact \
-            --quiet
+            --soft-fail
         continue-on-error: true
 
       - name: Upload SARIF results to GitHub Security tab
