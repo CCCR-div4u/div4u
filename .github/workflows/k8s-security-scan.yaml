@@ -377,36 +377,27 @@ jobs:
           # 이슈 개수 확인 및 디버깅
           echo "🔍 JSON 파일 내용 확인:"
           echo "파일 크기: $(wc -c < $JSON_FILE) bytes"
-          echo "첫 200자: $(head -c 200 $JSON_FILE)"
           
           ISSUE_COUNT=$(python3 -c "
           import json
           try:
               with open('$JSON_FILE', 'r') as f:
                   data = json.load(f)
-              print('JSON 로드 성공')
-              print('전체 구조:', list(data.keys()))
               
               # Checkov 결과 구조 확인
-              if 'results' in data:
-                  results = data['results']
-                  print('results 키 존재')
-                  if 'failed_checks' in results:
-                      failed_checks = results['failed_checks']
-                      print(f'failed_checks 개수: {len(failed_checks)}')
-                      print(failed_checks)
-                  else:
-                      print('failed_checks 키 없음, results 구조:', list(results.keys()))
+              if 'results' in data and 'failed_checks' in data['results']:
+                  failed_checks = data['results']['failed_checks']
+                  count = len(failed_checks)
+                  print(f'이슈개수:{count}')
               else:
-                  print('results 키 없음, 전체 구조:', data)
+                  print('이슈개수:0')
               
               # 실패한 검사 개수 추출
               failed_checks = data.get('results', {}).get('failed_checks', [])
               count = len(failed_checks)
-              print(f'최종 이슈 개수: {count}')
               print(count)
           except Exception as e:
-              print(f'오류 발생: {e}')
+              print('오류:', str(e))
               print(0)
           ")
           
@@ -427,14 +418,14 @@ jobs:
             const issueCount = process.env.ISSUE_COUNT || '0';
             const scanReason = process.env.SCAN_REASON || 'Unknown';
             
-            console.log(`🔍 Issue 생성 확인: 이슈 개수 = "${issueCount}"`);
-            console.log(`🔍 이슈 개수 타입: ${typeof issueCount}`);
-            console.log(`🔍 이슈 개수 != '0': ${issueCount !== '0'}`);
-            console.log(`🔍 이슈 개수 > 0: ${parseInt(issueCount) > 0}`);
+            console.log('Issue 생성 확인: 이슈 개수 = ' + issueCount);
+            console.log('이슈 개수 타입: ' + typeof issueCount);
+            console.log('이슈 개수 != 0: ' + (issueCount !== '0'));
+            console.log('이슈 개수 > 0: ' + (parseInt(issueCount) > 0));
             
             // 보안 이슈가 있는 경우에만 Issue 생성
             if (issueCount && issueCount !== '0' && parseInt(issueCount) > 0) {
-              console.log(`🚨 보안 이슈 ${issueCount}개 발견 - GitHub Issue 생성 중...`);
+              console.log('보안 이슈 ' + issueCount + '개 발견 - GitHub Issue 생성 중...');
               
               // 심각도에 따른 라벨 결정
               const criticalCount = (analysis.match(/Critical/gi) || []).length;
@@ -454,56 +445,32 @@ jobs:
               }
               
               // Issue 제목 생성
-              const title = `🔒 div4u K8s 보안 검사 결과: ${issueCount}개 이슈 발견 (${priority.toUpperCase()})`;
+              const title = '🔒 div4u K8s 보안 검사 결과: ' + issueCount + '개 이슈 발견 (' + priority.toUpperCase() + ')';
               
-              // Issue 본문 생성
+              // Issue 본문 생성 (간단한 형태)
               const branchName = context.ref.replace('refs/heads/', '');
               const commitSha = context.sha.substring(0, 7);
-              const serverUrl = context.payload.repository.html_url;
-              const runId = context.runId;
               
-              const issueBody = "## 🔒 div4u Kubernetes 보안 검사 결과\n\n" +
-                "### 📊 검사 요약\n" +
-                "- **발견된 이슈**: " + issueCount + "개\n" +
-                "- **우선순위**: " + priority.toUpperCase() + "\n" +
-                "- **실행 이유**: " + scanReason + "\n" +
-                "- **브랜치**: `" + branchName + "`\n" +
-                "- **커밋**: `" + commitSha + "`\n" +
-                "- **검사 시간**: " + new Date().toISOString().replace('T', ' ').substring(0, 19) + " UTC\n\n" +
-                "### 🔍 상세 분석 결과\n\n" +
-                analysis + "\n\n" +
-                "### 📋 조치 방법\n\n" +
-                "#### 즉시 조치 필요 (Critical/High)\n" +
+              const issueBody = '## 🔒 div4u Kubernetes 보안 검사 결과\\n\\n' +
+                '### 📊 검사 요약\\n' +
+                '- 발견된 이슈: ' + issueCount + '개\\n' +
+                '- 우선순위: ' + priority.toUpperCase() + '\\n' +
+                '- 실행 이유: ' + scanReason + '\\n' +
+                '- 브랜치: ' + branchName + '\\n' +
+                '- 커밋: ' + commitSha + '\\n\\n' +
+                '### 🔍 상세 분석 결과\\n\\n' +
+                analysis + '\\n\\n' +
+                '### 📋 조치 방법\\n\\n' +
                 (criticalCount > 0 || highCount > 0 ? 
-                  "⚠️ **우선순위가 높은 보안 이슈가 발견되었습니다. 즉시 수정이 필요합니다.**" : 
-                  "✅ Critical/High 우선순위 이슈는 없습니다.") + "\n\n" +
-                "#### 권장 조치사항\n" +
-                "1. **보안 컨텍스트 강화**\n" +
-                "   - `securityContext` 설정 추가\n" +
-                "   - `runAsNonRoot: true` 설정\n" +
-                "   - `readOnlyRootFilesystem: true` 적용\n\n" +
-                "2. **리소스 제한 설정**\n" +
-                "   - CPU/Memory `requests` 및 `limits` 설정\n" +
-                "   - 적절한 리소스 할당으로 DoS 공격 방지\n\n" +
-                "3. **네트워크 보안**\n" +
-                "   - NetworkPolicy 적용\n" +
-                "   - 불필요한 포트 노출 제거\n\n" +
-                "4. **이미지 보안**\n" +
-                "   - 최신 베이스 이미지 사용\n" +
-                "   - 취약점 스캔된 이미지 사용\n\n" +
-                "### 🔗 관련 링크\n" +
-                "- [워크플로우 실행 결과](" + serverUrl + "/actions/runs/" + runId + ")\n" +
-                "- [보안 검사 아티팩트](" + serverUrl + "/actions/runs/" + runId + "#artifacts)\n" +
-                "- [Checkov 문서](https://www.checkov.io/5.Policy%20Index/kubernetes.html)\n\n" +
-                "### ✅ 완료 체크리스트\n" +
-                "- [ ] Critical 이슈 수정 완료\n" +
-                "- [ ] High 이슈 수정 완료\n" +
-                "- [ ] Medium 이슈 검토 및 수정\n" +
-                "- [ ] 보안 검사 재실행 및 통과 확인\n" +
-                "- [ ] 코드 리뷰 완료\n\n" +
-                "---\n" +
-                "*🤖 이 Issue는 div4u Kubernetes 보안 검사 워크플로우에 의해 자동 생성되었습니다.*\n" +
-                "*수정 완료 후 보안 검사를 다시 실행하여 모든 이슈가 해결되었는지 확인해주세요.*";
+                  '⚠️ 우선순위가 높은 보안 이슈가 발견되었습니다. 즉시 수정이 필요합니다.' : 
+                  '✅ Critical/High 우선순위 이슈는 없습니다.') + '\\n\\n' +
+                '#### 권장 조치사항\\n' +
+                '1. 보안 컨텍스트 강화 (securityContext 설정)\\n' +
+                '2. 리소스 제한 설정 (requests/limits)\\n' +
+                '3. 네트워크 보안 (NetworkPolicy)\\n' +
+                '4. 이미지 보안 (최신 이미지 사용)\\n\\n' +
+                '---\\n' +
+                '🤖 이 Issue는 div4u Kubernetes 보안 검사 워크플로우에 의해 자동 생성되었습니다.';
 
               try {
                 const issue = await github.rest.issues.create({
@@ -515,8 +482,8 @@ jobs:
                   assignees: []
                 });
                 
-                console.log(`✅ GitHub Issue 생성 완료: #${issue.data.number}`);
-                console.log(`🔗 Issue URL: ${issue.data.html_url}`);
+                console.log('✅ GitHub Issue 생성 완료: #' + issue.data.number);
+                console.log('🔗 Issue URL: ' + issue.data.html_url);
                 
                 core.setOutput('issue_url', issue.data.html_url);
                 core.setOutput('issue_number', issue.data.number.toString());
@@ -527,7 +494,7 @@ jobs:
                 core.setOutput('issue_number', '');
               }
             } else {
-              console.log(`✅ 보안 이슈가 없어 Issue를 생성하지 않습니다. (이슈 개수: ${issueCount})`);
+              console.log('✅ 보안 이슈가 없어 Issue를 생성하지 않습니다. (이슈 개수: ' + issueCount + ')');
               core.setOutput('issue_url', '');
               core.setOutput('issue_number', '');
             }
