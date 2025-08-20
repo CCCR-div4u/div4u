@@ -3,18 +3,21 @@ name: Kubernetes Security Scan
 on:
   # PR 생성/업데이트 시 실행
   pull_request:
-    branches: [main, develop]
+    branches: [ main, develop ]
     paths:
       - 'k8s/**'
       - '.github/workflows/k8s-security-scan.yaml'
-  # 브랜치 push 시 실행 (메인 브랜치 + 테스트용 feature 브랜치)
+
+  # 브랜치 push 시 실행 (메인/개발/테스트 브랜치)
   push:
-    branches: [main, develop, 'feature/k8s-security-scan']
+    branches: [ main, develop, 'feature/k8s-security-scan' ]
     paths:
       - 'k8s/**'
       - '.github/workflows/k8s-security-scan.yaml'
+
   # 수동 실행
   workflow_dispatch:
+
   # 정기 스캔 (매일 오전 9시 UTC)
   schedule:
     - cron: '0 9 * * *'
@@ -38,14 +41,13 @@ jobs:
       workflow_changed: ${{ steps.filter.outputs.workflow }}
       should_scan: ${{ steps.decide.outputs.should_scan }}
       scan_reason: ${{ steps.decide.outputs.scan_reason }}
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Detect changed paths
-        uses: dorny/paths-filter@v3
         id: filter
+        uses: dorny/paths-filter@v3
         with:
           filters: |
             k8s:
@@ -56,41 +58,37 @@ jobs:
       - name: Decide scan execution
         id: decide
         run: |
-          # 스케줄 실행인 경우
+          # 스케줄 실행
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "should_scan=true" >> $GITHUB_OUTPUT
-            echo "scan_reason=정기 보안 검사 (스케줄)" >> $GITHUB_OUTPUT
-            echo "📅 정기 보안 검사 실행"
+            echo "should_scan=true" >> "$GITHUB_OUTPUT"
+            echo "scan_reason=정기 보안 검사 (스케줄)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
-          # 수동 실행인 경우
+
+          # 수동 실행
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "should_scan=true" >> $GITHUB_OUTPUT
-            echo "scan_reason=수동 실행" >> $GITHUB_OUTPUT
-            echo "🔧 수동 보안 검사 실행"
+            echo "should_scan=true" >> "$GITHUB_OUTPUT"
+            echo "scan_reason=수동 실행" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
-          # 워크플로우 파일 변경인 경우
+
+          # 워크플로 변경
           if [ "${{ steps.filter.outputs.workflow }}" = "true" ]; then
-            echo "should_scan=true" >> $GITHUB_OUTPUT
-            echo "scan_reason=워크플로우 파일 변경" >> $GITHUB_OUTPUT
-            echo "🔄 워크플로우 변경으로 인한 보안 검사 실행"
+            echo "should_scan=true" >> "$GITHUB_OUTPUT"
+            echo "scan_reason=워크플로우 파일 변경" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
-          # k8s 디렉터리 변경인 경우
+
+          # k8s 디렉터리 변경
           if [ "${{ steps.filter.outputs.k8s }}" = "true" ]; then
-            echo "should_scan=true" >> $GITHUB_OUTPUT
-            echo "scan_reason=k8s 매니페스트 변경" >> $GITHUB_OUTPUT
-            echo "📦 k8s 매니페스트 변경으로 인한 보안 검사 실행"
+            echo "should_scan=true" >> "$GITHUB_OUTPUT"
+            echo "scan_reason=k8s 매니페스트 변경" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
-          # 변경사항이 없는 경우
-          echo "should_scan=false" >> $GITHUB_OUTPUT
-          echo "scan_reason=변경사항 없음" >> $GITHUB_OUTPUT
+
+          # 변경사항 없음
+          echo "should_scan=false" >> "$GITHUB_OUTPUT"
+          echo "scan_reason=변경사항 없음" >> "$GITHUB_OUTPUT"
           echo "⏭️ 스캔 대상에 변경사항이 없습니다"
 
   # Kubernetes 매니페스트 보안 스캔
@@ -98,24 +96,23 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.should_scan == 'true'
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Display scan info
         run: |
-          echo "🔍 보안 스캔 시작"
-          echo "📦 대상: div4u Kubernetes 매니페스트"
-          echo "📁 스캔 디렉터리: k8s/"
-          echo "🎯 실행 이유: ${{ needs.detect-changes.outputs.scan_reason }}"
-          echo "🌿 브랜치: ${{ github.ref_name }}"
-          echo "📝 커밋: ${{ github.sha }}"
-          echo ""
-          echo "📋 현재 k8s 디렉터리 파일 목록:"
-          ls -la k8s/
-          echo ""
-          echo "🔍 취약한 테스트 파일 확인:"
+          echo "보안 스캔 시작"
+          echo "대상: div4u Kubernetes 매니페스트"
+          echo "스캔 디렉터리: k8s/"
+          echo "실행 이유: ${{ needs.detect-changes.outputs.scan_reason }}"
+          echo "브랜치: ${{ github.ref_name }}"
+          echo "커밋: ${{ github.sha }}"
+          echo
+          echo "현재 k8s 디렉터리 파일 목록:"
+          ls -la k8s/ || true
+          echo
+          echo "취약한 테스트 파일 확인:"
           if [ -f "k8s/test-vulnerable-deployment.yaml" ]; then
             echo "✅ test-vulnerable-deployment.yaml 존재 ($(wc -c < k8s/test-vulnerable-deployment.yaml) bytes)"
           else
@@ -126,78 +123,76 @@ jobs:
           else
             echo "❌ test-insecure-pod.yaml 없음"
           fi
-          echo ""
           echo "::notice::${{ needs.detect-changes.outputs.scan_reason }}으로 인한 보안 검사 실행"
 
       - name: Create directories
         run: |
           mkdir -p reports results
-          echo "📁 디렉터리 생성 완료: reports, results"
+          echo "디렉터리 생성 완료: reports, results"
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Checkov
+      - name: Install Checkov & deps
         run: |
-          pip install checkov
+          pip install -U checkov requests
           checkov --version
+          python -V
           echo "✅ Checkov 설치 완료"
 
       - name: Run Checkov security scan
+        shell: bash
         run: |
-          echo "🔍 Checkov 보안 스캔 시작..."
-          
-          # k8s 디렉터리의 모든 YAML 파일을 하나로 합치기
-          echo "📋 Kubernetes 매니페스트 파일 수집 중..."
-          find k8s -name "*.yaml" -o -name "*.yml" | while read -r file; do
-            echo "📄 처리 중: $file"
+          echo "Checkov 보안 스캔 시작..."
+
+          # k8s 디렉터리의 모든 YAML을 하나로 합치기
+          echo "Kubernetes 매니페스트 파일 수집 중..."
+          > "results/all-manifests.yaml"
+          find k8s -type f \( -name "*.yaml" -o -name "*.yml" \) | while read -r file; do
+            echo "처리 중: $file"
             echo "---" >> "results/all-manifests.yaml"
             cat "$file" >> "results/all-manifests.yaml"
           done
-          
+
           # 매니페스트 파일 확인
           if [ ! -s "results/all-manifests.yaml" ]; then
             echo "❌ Kubernetes 매니페스트 파일을 찾을 수 없습니다"
             exit 1
           fi
-          
+
           LINES=$(wc -l < "results/all-manifests.yaml")
           SIZE=$(wc -c < "results/all-manifests.yaml")
           echo "✅ 매니페스트 수집 완료: ${LINES}줄, ${SIZE}바이트"
-          
+
           # Checkov 스캔 실행 (JSON 출력)
-          echo "🔍 Checkov 보안 검사 실행 중..."
-          
-          # JSON 출력으로 스캔 실행
+          echo "Checkov 보안 검사 실행 중..."
           if checkov \
-            --file results/all-manifests.yaml \
-            --framework kubernetes \
-            --output json \
-            --soft-fail \
-            --quiet > reports/checkov-results.json 2>/dev/null; then
+              --file results/all-manifests.yaml \
+              --framework kubernetes \
+              --output json \
+              --soft-fail \
+              --quiet > reports/checkov-results.json 2>/dev/null; then
             echo "✅ Checkov 스캔 성공"
           else
             echo "⚠️ Checkov 스캔 중 오류 발생, 기본 결과 생성"
           fi
-          
+
           # JSON 파일 검증 및 기본값 설정
           if [ -f "reports/checkov-results.json" ] && [ -s "reports/checkov-results.json" ]; then
-            # JSON 유효성 검사
             if python3 -m json.tool reports/checkov-results.json > /dev/null 2>&1; then
               echo "✅ 유효한 JSON 파일 생성: $(wc -c < reports/checkov-results.json) bytes"
             else
               echo "❌ 잘못된 JSON 형식, 기본 JSON 생성"
-              echo '{"check_type": "kubernetes", "results": {"failed_checks": []}, "summary": {"passed": 0, "failed": 0, "skipped": 0, "parsing_errors": 0, "resource_count": 0, "checkov_version": "unknown"}}' > reports/checkov-results.json
+              echo '{"check_type":"kubernetes","results":{"failed_checks":[]},"summary":{"passed":0,"failed":0,"skipped":0,"parsing_errors":0,"resource_count":0,"checkov_version":"unknown"}}' > reports/checkov-results.json
             fi
           else
             echo "❌ JSON 파일 생성 실패, 기본 JSON 생성"
-            echo '{"check_type": "kubernetes", "results": {"failed_checks": []}, "summary": {"passed": 0, "failed": 0, "skipped": 0, "parsing_errors": 0, "resource_count": "unknown"}}' > reports/checkov-results.json
+            echo '{"check_type":"kubernetes","results":{"failed_checks":[]},"summary":{"passed":0,"failed":0,"skipped":0,"parsing_errors":0,"resource_count":"unknown"}}' > reports/checkov-results.json
           fi
-          
-          echo "📊 JSON 결과 준비 완료"
-          
+          echo "JSON 결과 준비 완료"
+
       - name: Analyze security results with OpenAI
         if: always()
         id: openai-analysis
@@ -205,108 +200,67 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           JSON_FILE="reports/checkov-results.json"
-          
-          if [ ! -f "$JSON_FILE" ] || [ ! -s "$JSON_FILE" ]; then
-            echo "📄 JSON 결과 파일이 없거나 비어있습니다."
-            echo "analysis_result=보안 검사 결과를 찾을 수 없거나 스캔이 실패했습니다." >> $GITHUB_OUTPUT
-            echo "issue_count=0" >> $GITHUB_OUTPUT
+          if [ ! -f "$JSON_FILE" ] || [ -z "$(cat "$JSON_FILE" 2>/dev/null)" ]; then
+            echo "analysis_result=보안 검사 결과를 찾을 수 없거나 스캔이 실패했습니다." >> "$GITHUB_OUTPUT"
+            echo "issue_count=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          
-          echo "🤖 OpenAI를 통한 보안 분석 시작..."
-          
+
+          echo "OpenAI를 통한 보안 분석 시작..."
+
           # OpenAI API 호출을 위한 Python 스크립트 생성
-          cat > analyze_security.py << 'EOF'
-          import json
-          import os
-          import sys
-          import requests
-          
+          cat > analyze_security.py << 'PY'
+          import json, os, sys, requests
+
           def analyze_checkov_results(json_file):
               try:
                   with open(json_file, 'r', encoding='utf-8') as f:
                       data = json.load(f)
-                  
-                  # Checkov 결과에서 실패한 검사들 추출 (다양한 구조 지원)
+
+                  # 실패한 검사 추출 (딕셔너리/리스트 구조 모두 지원)
                   failed_checks = []
-                  if 'results' in data and isinstance(data['results'], dict):
+                  if isinstance(data.get('results'), dict):
                       failed_checks = data['results'].get('failed_checks', [])
-                  elif 'results' in data and isinstance(data['results'], list):
-                      # 다른 형태의 결과 구조 처리
-                      for result in data['results']:
-                          if 'failed_checks' in result:
-                              failed_checks.extend(result['failed_checks'])
-                  
+                  elif isinstance(data.get('results'), list):
+                      for r in data['results']:
+                          failed_checks.extend(r.get('failed_checks', []))
+
                   if not failed_checks:
                       return "✅ 보안 검사 통과: 발견된 보안 이슈가 없습니다."
-                  
+
                   # 심각도별 분류
-                  critical_issues = []
-                  high_issues = []
-                  medium_issues = []
-                  low_issues = []
-                  
-                  for check in failed_checks:
-                      severity = check.get('severity')
-                      if severity:
-                          severity = severity.upper()
-                      else:
-                          severity = 'UNKNOWN'
-                      
-                      issue_info = {
-                          'check_id': check.get('check_id', 'N/A'),
-                          'check_name': check.get('check_name', 'N/A'),
-                          'file_path': check.get('file_path', 'N/A'),
-                          'resource': check.get('resource', 'N/A'),
-                          'description': check.get('description', 'N/A')
+                  buckets = {'CRITICAL':[], 'HIGH':[], 'MEDIUM':[], 'LOW':[], 'UNKNOWN':[]}
+                  for c in failed_checks:
+                      sev = (c.get('severity') or 'UNKNOWN').upper()
+                      info = {
+                          'check_id': c.get('check_id','N/A'),
+                          'check_name': c.get('check_name','N/A'),
+                          'file_path': c.get('file_path','N/A'),
+                          'resource': c.get('resource','N/A'),
+                          'description': c.get('description','N/A')
                       }
-                      
-                      if severity == 'CRITICAL':
-                          critical_issues.append(issue_info)
-                      elif severity == 'HIGH':
-                          high_issues.append(issue_info)
-                      elif severity == 'MEDIUM':
-                          medium_issues.append(issue_info)
-                      else:
-                          low_issues.append(issue_info)
-                  
-                  # OpenAI API 호출
+                      buckets.get(sev if sev in buckets else 'UNKNOWN').append(info)
+
+                  # OpenAI 호출 (키 없으면 기본 리포트 반환)
                   api_key = os.getenv('OPENAI_API_KEY')
                   if not api_key:
-                      return generate_basic_report(critical_issues, high_issues, medium_issues, low_issues)
-                  
-                  prompt = f"""
-          다음은 div4u 프로젝트의 Kubernetes 매니페스트 보안 검사(Checkov) 결과입니다. 
-          개발팀에게 전달할 보안 보고서를 한국어로 작성해주세요.
-          
-          Critical 이슈: {len(critical_issues)}개
-          High 이슈: {len(high_issues)}개  
-          Medium 이슈: {len(medium_issues)}개
-          Low 이슈: {len(low_issues)}개
-          
-          상세 이슈들:
-          {json.dumps({'critical': critical_issues, 'high': high_issues, 'medium': medium_issues, 'low': low_issues}, indent=2, ensure_ascii=False)}
-          
-          다음 형식으로 보고서를 작성해주세요:
-          1. 전체 요약 (보안 상태 평가)
-          2. 우선순위별 이슈 분석 (Critical/High 우선)
-          3. 구체적인 수정 방법 및 권장사항
-          4. div4u 프로젝트 특성을 고려한 보안 강화 방안
-          
-          보고서는 개발자가 바로 실행할 수 있는 구체적인 내용으로 작성해주세요.
-          """
-                  
+                      return basic_report(buckets)
+
+                  prompt = f"""다음은 div4u 프로젝트의 Kubernetes 매니페스트 보안 검사(Checkov) 결과입니다.
+                  Critical: {len(buckets['CRITICAL'])}개 / High: {len(buckets['HIGH'])}개 / Medium: {len(buckets['MEDIUM'])}개 / Low: {len(buckets['LOW'])}개
+                  상세 이슈: {json.dumps(buckets, ensure_ascii=False, indent=2)}
+                  아래 형식으로 한국어 보고서를 작성하세요:
+                  1) 전체 요약  2) 우선순위별 이슈 분석(Critical/High 중심)  3) 구체적 수정 방법  4) 프로젝트 특성 고려 권장사항
+                  """
+
                   try:
-                      response = requests.post(
+                      resp = requests.post(
                           'https://api.openai.com/v1/chat/completions',
-                          headers={
-                              'Authorization': f'Bearer {api_key}',
-                              'Content-Type': 'application/json'
-                          },
+                          headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
                           json={
                               'model': 'gpt-4o-mini',
                               'messages': [
-                                  {'role': 'system', 'content': '당신은 Kubernetes 보안 전문가입니다. div4u 프로젝트의 보안 검사 결과를 분석하여 개발팀에게 명확하고 실행 가능한 보고서를 제공합니다.'},
+                                  {'role': 'system', 'content': '당신은 Kubernetes 보안 전문가입니다.'},
                                   {'role': 'user', 'content': prompt}
                               ],
                               'max_tokens': 3000,
@@ -314,112 +268,65 @@ jobs:
                           },
                           timeout=30
                       )
-                      
-                      if response.status_code == 200:
-                          result = response.json()
-                          return result['choices'][0]['message']['content']
-                      else:
-                          print(f"OpenAI API 오류: {response.status_code}")
-                          return generate_basic_report(critical_issues, high_issues, medium_issues, low_issues)
-                          
-                  except Exception as e:
-                      print(f"OpenAI API 호출 실패: {e}")
-                      return generate_basic_report(critical_issues, high_issues, medium_issues, low_issues)
-                      
+                      if resp.status_code == 200:
+                          return resp.json()['choices'][0]['message']['content']
+                      return basic_report(buckets)
+                  except Exception:
+                      return basic_report(buckets)
               except Exception as e:
-                  return f"❌ 분석 실패: {str(e)}"
-          
-          def generate_basic_report(critical, high, medium, low):
-              total_issues = len(critical) + len(high) + len(medium) + len(low)
-              
-              report = f"""## 🔒 div4u Kubernetes 보안 검사 결과
-          
-          ### 📊 요약
-          - **총 이슈**: {total_issues}개
-          - **Critical**: {len(critical)}개 🔴
-          - **High**: {len(high)}개 🟠  
-          - **Medium**: {len(medium)}개 🟡
-          - **Low**: {len(low)}개 ⚪
-          
-          ### 🚨 우선 조치 필요 (Critical + High)
-          """
-              
-              priority_issues = critical + high
-              if priority_issues:
-                  for i, issue in enumerate(priority_issues[:5], 1):
-                      report += f"""
-          **{i}. {issue['check_name']}**
-          - 파일: `{issue['file_path']}`
-          - 리소스: `{issue['resource']}`
-          - 설명: {issue['description']}
-          """
+                  return f"❌ 분석 실패: {e}"
+
+          def basic_report(b):
+              total = sum(len(v) for v in b.values())
+              report = [f"## div4u Kubernetes 보안 검사 결과",
+                        f"### 요약",
+                        f"- 총 이슈: {total}개  (Critical {len(b['CRITICAL'])} / High {len(b['HIGH'])} / Medium {len(b['MEDIUM'])} / Low {len(b['LOW'])})",
+                        "### 우선 조치 필요 (Critical+High)"]
+              prio = b['CRITICAL'] + b['HIGH']
+              if prio:
+                  for i, issue in enumerate(prio[:5], 1):
+                      report.append(f"**{i}. {issue['check_name']}**  파일:`{issue['file_path']}`  리소스:`{issue['resource']}`  설명:{issue['description']}")
+                  if len(prio) > 5:
+                      report.append(f"*추가로 {len(prio)-5}개 더 있음*")
               else:
-                  report += "\n✅ 우선 조치가 필요한 Critical/High 이슈가 없습니다."
-              
-              if len(priority_issues) > 5:
-                  report += f"\n\n*추가로 {len(priority_issues) - 5}개의 우선순위 이슈가 더 있습니다.*"
-              
-              report += f"""
-          
-          ### 📋 div4u 프로젝트 권장 조치사항
-          1. **즉시 수정**: Critical/High 이슈를 우선적으로 해결
-          2. **보안 강화**: 컨테이너 보안 컨텍스트 설정 검토
-          3. **리소스 관리**: CPU/Memory 제한 및 요청 설정
-          4. **네트워크 보안**: NetworkPolicy 및 서비스 보안 검토
-          5. **정기 검사**: 매니페스트 변경 시 자동 보안 검사 활용
-          
-          전체 상세 결과는 GitHub Actions 아티팩트에서 확인할 수 있습니다.
-          """
-              
-              return report
-          
+                  report.append("✅ 우선 조치가 필요한 Critical/High 이슈가 없습니다.")
+              report.append("### 권장 조치사항\n- Critical/High 우선 해결\n- 컨테이너 보안 컨텍스트/리소스 제한 설정\n- NetworkPolicy/Service 보안 검토\n- 정기 자동 검사 활용")
+              return "\n".join(report)
+
           if __name__ == "__main__":
-              if len(sys.argv) != 2:
-                  print("Usage: python analyze_security.py <json_file>")
-                  sys.exit(1)
-              
-              result = analyze_checkov_results(sys.argv[1])
-              print(result)
-          EOF
-          
+              jf = sys.argv[1]
+              print(analyze_checkov_results(jf))
+          PY
+
           # Python 스크립트 실행
           python3 analyze_security.py "$JSON_FILE" > analysis_result.txt
-          
-          # GitHub Output에 결과 저장 (멀티라인 처리)
-          echo "analysis_result<<EOF" >> $GITHUB_OUTPUT
-          cat analysis_result.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          
-          # 이슈 개수 확인 및 디버깅
-          echo "🔍 JSON 파일 내용 확인:"
-          echo "파일 크기: $(wc -c < $JSON_FILE) bytes"
-          
-          ISSUE_COUNT=$(python3 -c "
-          import json
+
+          # ✅ 멀티라인 출력 (공식 문법)
+          {
+            echo 'analysis_result<<EOF'
+            cat analysis_result.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+          # 이슈 개수 (숫자만 출력)
+          ISSUE_COUNT=$(python3 - <<'PY'
+          import json, sys
           try:
-              with open('$JSON_FILE', 'r') as f:
-                  data = json.load(f)
-              
-              # Checkov 결과 구조 확인
-              if 'results' in data and 'failed_checks' in data['results']:
-                  failed_checks = data['results']['failed_checks']
-                  count = len(failed_checks)
-                  print(f'이슈개수:{count}')
-              else:
-                  print('이슈개수:0')
-              
-              # 실패한 검사 개수 추출
-              failed_checks = data.get('results', {}).get('failed_checks', [])
-              count = len(failed_checks)
-              print(count)
-          except Exception as e:
-              print('오류:', str(e))
+              with open("reports/checkov-results.json","r",encoding="utf-8") as f:
+                  d=json.load(f)
+              failed=[]
+              if isinstance(d.get("results"), dict):
+                  failed = d["results"].get("failed_checks", [])
+              elif isinstance(d.get("results"), list):
+                  for r in d["results"]:
+                      failed.extend(r.get("failed_checks", []))
+              print(len(failed))
+          except Exception:
               print(0)
-          ")
-          
-          echo "🔢 추출된 이슈 개수: $ISSUE_COUNT"
-          echo "issue_count=$ISSUE_COUNT" >> $GITHUB_OUTPUT
-          
+          PY
+          )
+          echo "issue_count=$ISSUE_COUNT" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Issue for security findings
         if: always()
         id: create-issue
@@ -431,123 +338,69 @@ jobs:
         with:
           script: |
             const analysis = process.env.ANALYSIS_RESULT || '분석 결과를 가져올 수 없습니다.';
-            const issueCount = process.env.ISSUE_COUNT || '0';
+            const issueCount = Number(process.env.ISSUE_COUNT || '0');
             const scanReason = process.env.SCAN_REASON || 'Unknown';
-            
-            console.log('Issue 생성 확인: 이슈 개수 = ' + issueCount);
-            console.log('이슈 개수 타입: ' + typeof issueCount);
-            console.log('이슈 개수 != 0: ' + (issueCount !== '0'));
-            console.log('이슈 개수 > 0: ' + (parseInt(issueCount) > 0));
-            
-            // 보안 이슈가 있는 경우에만 Issue 생성
-            if (issueCount && issueCount !== '0' && parseInt(issueCount) > 0) {
-              console.log('보안 이슈 ' + issueCount + '개 발견 - GitHub Issue 생성 중...');
-              
-              // 심각도에 따른 라벨 및 우선순위 결정
+
+            if (Number.isFinite(issueCount) && issueCount > 0) {
+              // 간단한 심각도 추정
               const criticalCount = (analysis.match(/Critical/gi) || []).length;
               const highCount = (analysis.match(/High/gi) || []).length;
               const mediumCount = (analysis.match(/Medium/gi) || []).length;
               const lowCount = (analysis.match(/Low/gi) || []).length;
-              
-              let labels = ['security', 'kubernetes', 'checkov'];
+
               let priority = 'medium';
               let priorityLabel = 'medium';
-              
-              if (criticalCount > 0) {
-                labels.push('critical');
-                priority = 'critical';
-                priorityLabel = 'critical';
-              } else if (highCount > 0) {
-                labels.push('high');
-                priority = 'high';
-                priorityLabel = 'high';
-              } else {
-                labels.push('medium');
-                priority = 'medium';
-                priorityLabel = 'medium';
-              }
-              
-              // Issue 제목 생성
-              const title = `🔒 div4u K8s 보안 검사 결과: ${issueCount}개 이슈 발견 (${priority.toUpperCase()})`;
-              
-              // 브랜치 및 커밋 정보
+              if (criticalCount > 0) { priority = 'critical'; priorityLabel = 'critical'; }
+              else if (highCount > 0) { priority = 'high'; priorityLabel = 'high'; }
+
+              const title = `div4u K8s 보안 검사 결과: ${issueCount}개 이슈 발견 (${priority.toUpperCase()})`;
               const branchName = context.ref.replace('refs/heads/', '');
-              const commitSha = context.sha.substring(0, 7);
-              
-              // 심각도별 분포 표시
+              const commitSha = context.sha.substring(0,7);
               const severityDisplay = [
-                criticalCount > 0 ? `🔴 Critical: ${criticalCount}개` : '',
-                highCount > 0 ? `🟠 High: ${highCount}개` : '',
-                mediumCount > 0 ? `🟡 Medium: ${mediumCount}개` : '',
-                lowCount > 0 ? `⚪ Low: ${lowCount}개` : ''
+                criticalCount ? `Critical: ${criticalCount}개` : '',
+                highCount ? `High: ${highCount}개` : '',
+                mediumCount ? `Medium: ${mediumCount}개` : '',
+                lowCount ? `Low: ${lowCount}개` : ''
               ].filter(Boolean).join(' | ');
-              
-              // Issue 본문 생성
-              const body = `## 🔒 div4u Kubernetes 보안 검사 결과
 
-### 📊 검사 요약
-- **발견된 이슈**: ${issueCount}개
-- **우선순위**: ${priority.toUpperCase()}
-- **실행 이유**: ${scanReason}
-- **브랜치**: \`${branchName}\`
-- **커밋**: \`${commitSha}\`
+              const body = `## div4u Kubernetes 보안 검사 결과
+              ### 검사 요약
+              - **발견된 이슈**: ${issueCount}개
+              - **우선순위**: ${priority.toUpperCase()}
+              - **실행 이유**: ${scanReason}
+              - **브랜치**: \`${branchName}\`
+              - **커밋**: \`${commitSha}\`
 
-### 🎯 심각도별 분포
-${severityDisplay}
+              ### 심각도별 분포
+              ${severityDisplay}
 
----
+              ---
+              ${analysis}
 
-${analysis}
+              ## 해결 체크리스트
+              - [ ] Critical/High 우선 해결
+              - [ ] 매니페스트 수정 및 테스트
+              - [ ] 재검사 수행 (PR 시 자동 실행)
+              - [ ] ✅ 이슈 해결 확인
 
-## 📋 해결 체크리스트
-${criticalCount > 0 ? '- [ ] 🔴 **Critical 이슈 즉시 해결** (보안 위험 높음)' : ''}
-${highCount > 0 ? '- [ ] 🟠 **High 이슈 우선 해결** (보안 위험 있음)' : ''}
-${mediumCount > 0 ? '- [ ] 🟡 **Medium 이슈 검토** (보안 개선 필요)' : ''}
-${lowCount > 0 ? '- [ ] ⚪ **Low 이슈 검토** (보안 강화 권장)' : ''}
-- [ ] 📝 k8s 매니페스트 수정사항 적용
-- [ ] 🧪 로컬 환경에서 테스트
-- [ ] 🔄 재검사 수행 (PR 생성 시 자동 실행)
-- [ ] ✅ 이슈 해결 확인
+              ## 링크
+              - [워크플로우 실행 결과](${context.payload.repository.html_url}/actions/runs/${context.runId})
+              - [div4u k8s 디렉터리](${context.payload.repository.html_url}/tree/${branchName}/k8s)
+              - Checkov 정책 가이드: https://www.checkov.io/5.Policy%20Index/kubernetes.html
 
-## 🔗 관련 링크
-- [워크플로우 실행 결과](${context.payload.repository.html_url}/actions/runs/${context.runId})
-- [div4u k8s 디렉터리](${context.payload.repository.html_url}/tree/${branchName}/k8s)
-- [Checkov 정책 가이드](https://www.checkov.io/5.Policy%20Index/kubernetes.html)
+              *자동 생성된 보안 이슈입니다. 모든 이슈 해결 후 닫아주세요.*`;
 
-## 💡 div4u 프로젝트 보안 팁
-- 매니페스트 변경 시 자동으로 보안 검사가 실행됩니다
-- PR 생성 시에도 보안 검사가 수행되어 코드 리뷰에 도움이 됩니다
-- 정기적으로 매일 오전 9시에 전체 보안 검사가 실행됩니다
-
----
-*🤖 자동 생성된 보안 이슈입니다. 모든 이슈 해결 후 이 Issue를 닫아주세요.*  
-*📅 생성 시간: ${new Date().toISOString()}*`;
-              
-              const finalLabels = ['security', 'k8s', 'checkov', priorityLabel, 'automated'];
-              
-              try {
-                const issue = await github.rest.issues.create({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  title: title,
-                  body: body,
-                  labels: finalLabels
-                });
-                
-                console.log(`✅ Issue 생성 완료: ${title}`);
-                console.log(`📊 심각도 분포: ${severityDisplay}`);
-                console.log(`🔗 Issue URL: ${issue.data.html_url}`);
-                
-                core.setOutput('issue_url', issue.data.html_url);
-                core.setOutput('issue_number', issue.data.number);
-                
-              } catch (error) {
-                console.error('❌ Issue 생성 실패:', error);
-                core.setOutput('issue_url', '');
-                core.setOutput('issue_number', '');
-              }
+              const labels = ['security','k8s','checkov',priorityLabel,'automated'];
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels
+              });
+              core.setOutput('issue_url', issue.data.html_url);
+              core.setOutput('issue_number', issue.data.number);
             } else {
-              console.log('✅ 보안 이슈가 없어 Issue를 생성하지 않습니다. (이슈 개수: ' + issueCount + ')');
               core.setOutput('issue_url', '');
               core.setOutput('issue_number', '');
             }
@@ -564,138 +417,52 @@ ${lowCount > 0 ? '- [ ] ⚪ **Low 이슈 검토** (보안 강화 권장)' : ''}
         run: |
           if [ -z "$SLACK_WEBHOOK_URL_CHECKOV" ]; then
             echo "⚠️ Slack 웹훅 URL이 설정되지 않았습니다"
-            echo "SLACK_WEBHOOK_URL_CHECKOV secret을 설정하면 Slack 알림을 받을 수 있습니다"
             exit 0
           fi
-          
-          echo "📢 Slack 알림 전송 중..."
-          
-          # 보안 이슈 유무에 따른 메시지 설정
-          if [ "$ISSUE_COUNT" != "0" ] && [ -n "$ISSUE_URL" ]; then
-            # 보안 이슈가 있는 경우
-            MESSAGE_TEXT="div4u K8s 보안 검사 완료\\n보안 이슈 ${ISSUE_COUNT}개가 발견되었습니다.\\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
-            BUTTON_TEXT="보안 이슈 확인"
-            LINK_URL="$ISSUE_URL"
-            HEADER_EMOJI="🚨"
-            COLOR="danger"
-          else
-            # 보안 이슈가 없는 경우
-            MESSAGE_TEXT="div4u K8s 보안 검사 완료\\n보안 이슈가 발견되지 않았습니다.\\n모든 보안 검사를 통과했습니다."
-            BUTTON_TEXT="워크플로우 보기"
-            LINK_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            HEADER_EMOJI="✅"
-            COLOR="good"
-          fi
-          
-          python3 << 'EOF'
-          import json
-          import os
-          import urllib.request
-          import urllib.parse
-          
-          # 환경 변수에서 값 읽기
+
+          python3 << 'PY'
+          import json, os, urllib.request
           webhook_url = os.environ.get('SLACK_WEBHOOK_URL_CHECKOV')
-          issue_count = os.environ.get('ISSUE_COUNT', '0')
-          scan_reason = os.environ.get('SCAN_REASON', 'Unknown')
-          issue_url = os.environ.get('ISSUE_URL', '')
-          branch_name = os.environ.get('GITHUB_REF_NAME', 'unknown')
-          
-          # 보안 이슈 유무에 따른 메시지 설정
-          if issue_count != "0" and issue_url:
-              # 보안 이슈가 있는 경우
-              header_emoji = "🚨"
-              message_text = f"div4u K8s 보안 검사 완료\\n보안 이슈 {issue_count}개가 발견되었습니다.\\n상세 분석 결과 및 해결 가이드는 생성된 Issue에서 확인하세요."
-              button_text = "보안 이슈 확인"
-              link_url = issue_url
-              color = "danger"
-          else:
-              # 보안 이슈가 없는 경우
-              header_emoji = "✅"
-              message_text = "div4u K8s 보안 검사 완료\\n보안 이슈가 발견되지 않았습니다.\\n모든 보안 검사를 통과했습니다."
-              button_text = "워크플로우 보기"
-              link_url = f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
-              color = "good"
-          
-          # Slack 메시지 구조 생성 (간단한 형식으로 HTTP 400 오류 방지)
+          issue_count = os.environ.get('ISSUE_COUNT','0')
+          scan_reason = os.environ.get('SCAN_REASON','Unknown')
+          issue_url = os.environ.get('ISSUE_URL','')
+          branch_name = os.environ.get('GITHUB_REF_NAME','unknown')
+
+          has_issue = issue_count not in ('0','',None) and issue_count != '0' and issue_url
+          header_emoji = "" if has_issue else "✅"
+          message_text = (f"div4u K8s 보안 검사 완료\n보안 이슈 {issue_count}개가 발견되었습니다.\n"
+                          "상세 분석 결과는 생성된 Issue를 확인하세요.") if has_issue \
+                         else "div4u K8s 보안 검사 완료\n보안 이슈가 발견되지 않았습니다.\n모든 검사를 통과했습니다."
+          button_text = "보안 이슈 확인" if has_issue else "워크플로우 보기"
+          link_url = issue_url if has_issue else f"{os.environ.get('GITHUB_SERVER_URL','https://github.com')}/{os.environ.get('GITHUB_REPOSITORY','')}/actions/runs/{os.environ.get('GITHUB_RUN_ID','')}"
+
           slack_message = {
-              "text": f"{header_emoji} div4u K8s 보안 검사 결과",
-              "attachments": [
-                  {
-                      "color": color,
-                      "fields": [
-                          {
-                              "title": "프로젝트",
-                              "value": "div4u",
-                              "short": True
-                          },
-                          {
-                              "title": "발견된 이슈",
-                              "value": f"{issue_count}개",
-                              "short": True
-                          },
-                          {
-                              "title": "실행 이유",
-                              "value": scan_reason[:50] + "..." if len(scan_reason) > 50 else scan_reason,
-                              "short": True
-                          },
-                          {
-                              "title": "브랜치",
-                              "value": branch_name[:30] + "..." if len(branch_name) > 30 else branch_name,
-                              "short": True
-                          }
-                      ],
-                      "text": message_text.replace('\\n', '\n')[:500],  # 텍스트 길이 제한
-                      "actions": [
-                          {
-                              "type": "button",
-                              "text": button_text,
-                              "url": link_url,
-                              "style": "primary" if color == "good" else "danger"
-                          }
-                      ]
-                  }
-              ]
+            "text": f"{header_emoji} div4u K8s 보안 검사 결과",
+            "attachments": [{
+              "color": "danger" if has_issue else "good",
+              "fields": [
+                {"title":"프로젝트","value":"div4u","short":True},
+                {"title":"발견된 이슈","value":f"{issue_count}개","short":True},
+                {"title":"실행 이유","value":scan_reason,"short":True},
+                {"title":"브랜치","value":branch_name,"short":True}
+              ],
+              "text": message_text
+            }]
           }
-          
-          # Slack 웹훅으로 전송
+
+          data = json.dumps(slack_message, ensure_ascii=False).encode('utf-8')
+          req = urllib.request.Request(webhook_url, data=data, headers={'Content-Type':'application/json; charset=utf-8'})
           try:
-              data = json.dumps(slack_message, ensure_ascii=False).encode('utf-8')
-              req = urllib.request.Request(
-                  webhook_url,
-                  data=data,
-                  headers={
-                      'Content-Type': 'application/json; charset=utf-8',
-                      'User-Agent': 'div4u-security-scan/1.0'
-                  }
-              )
-              
-              with urllib.request.urlopen(req, timeout=10) as response:
-                  response_text = response.read().decode('utf-8')
-                  if response.status == 200:
-                      print("✅ Slack 알림 전송 완료")
-                      if issue_count != "0" and issue_url:
-                          print(f"🔗 Issue 링크: {issue_url}")
-                      else:
-                          print("✅ 보안 이슈 없음")
-                  else:
-                      print(f"❌ Slack 알림 전송 실패: HTTP {response.status}")
-                      print(f"응답: {response_text}")
-                      
-          except urllib.error.HTTPError as e:
-              error_body = e.read().decode('utf-8') if e.fp else 'No error body'
-              print(f"❌ Slack HTTP 오류: {e.code} {e.reason}")
-              print(f"오류 내용: {error_body}")
-              # 메시지 내용 디버깅
-              print(f"전송한 메시지 크기: {len(data)} bytes")
+            with urllib.request.urlopen(req, timeout=10) as r:
+              print("✅ Slack 알림 전송 완료 (HTTP", r.status,")")
           except Exception as e:
-              print(f"❌ Slack 알림 전송 실패: {e}")
-          EOF
+            print("❌ Slack 알림 전송 실패:", e)
+          PY
+
       - name: Generate SARIF report
         if: always()
         run: |
-          echo "📄 SARIF 보고서 생성 중..."
-          
-          # Checkov SARIF 출력 생성
+          echo "SARIF 보고서 생성 중..."
           if [ -f "results/all-manifests.yaml" ]; then
             checkov \
               --file results/all-manifests.yaml \
@@ -704,30 +471,22 @@ ${lowCount > 0 ? '- [ ] ⚪ **Low 이슈 검토** (보안 강화 권장)' : ''}
               --soft-fail \
               --quiet > reports/checkov-results.sarif || echo "SARIF 생성 실패, 빈 파일 생성"
           fi
-          
-          # SARIF 파일이 없거나 비어있으면 기본 SARIF 생성
+
           if [ ! -f "reports/checkov-results.sarif" ] || [ ! -s "reports/checkov-results.sarif" ]; then
-            echo "📄 기본 SARIF 파일 생성 중..."
             cat > reports/checkov-results.sarif << 'EOF'
-          {
-            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [
-              {
-                "tool": {
-                  "driver": {
-                    "name": "Checkov",
-                    "version": "unknown",
-                    "informationUri": "https://www.checkov.io/"
-                  }
-                },
-                "results": []
-              }
-            ]
-          }
-          EOF
+            {
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "version": "2.1.0",
+              "runs": [
+                {
+                  "tool": { "driver": { "name": "Checkov", "version": "unknown", "informationUri": "https://www.checkov.io/" } },
+                  "results": []
+                }
+              ]
+            }
+            EOF
           fi
-          
+
           echo "✅ SARIF 파일 생성 완료: $(wc -c < reports/checkov-results.sarif) bytes"
 
       - name: Upload SARIF to GitHub Security
@@ -758,41 +517,36 @@ ${lowCount > 0 ? '- [ ] ⚪ **Low 이슈 검토** (보안 강화 권장)' : ''}
       - name: No changes detected
         run: |
           echo "✅ k8s 디렉터리에 변경사항이 없습니다."
-          echo "📁 모니터링된 디렉터리: k8s/"
-          echo "🔧 워크플로 파일: .github/workflows/k8s-security-scan.yaml"
-          echo ""
-          echo "변경사항이 감지되면 자동으로 보안 스캔이 실행됩니다."
+          echo "모니터링 디렉터리: k8s/"
+          echo "워크플로 파일: .github/workflows/k8s-security-scan.yaml"
           echo "::notice::변경사항 없음 - 보안 스캔을 건너뜁니다."
 
   # 스캔 완료 요약
   summary:
-    needs: [detect-changes, security-scan]
+    needs: [ detect-changes, security-scan ]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Security scan summary
         run: |
-          echo "## 🔒 div4u Kubernetes 보안 스캔 완료"
-          echo ""
+          echo "## div4u Kubernetes 보안 스캔 완료"
+          echo
           echo "**프로젝트**: div4u"
           echo "**스캔 대상**: k8s/ 디렉터리"
           echo "**실행 이유**: ${{ needs.detect-changes.outputs.scan_reason }}"
           echo "**브랜치**: ${{ github.ref_name }}"
           echo "**커밋**: ${{ github.sha }}"
-          echo ""
-          
+          echo
           if [ "${{ needs.detect-changes.outputs.should_scan }}" = "true" ]; then
             echo "**스캔 결과**: ${{ needs.security-scan.result }}"
-            echo "**실행 시간**: $(date '+%Y-%m-%d %H:%M:%S UTC')"
-            echo ""
+            echo "**실행 시간**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
             echo "상세 결과는 아티팩트에서 확인할 수 있습니다."
           else
             echo "**스캔 상태**: 건너뜀 (변경사항 없음)"
           fi
-          
-          echo ""
-          echo "### 📋 div4u 보안 검사 정보"
-          echo "- **자동 트리거**: main/develop 브랜치의 k8s/ 디렉터리 변경 시"
-          echo "- **PR 검사**: Pull Request 생성 시 자동 실행"
-          echo "- **정기 검사**: 매일 오전 9시 UTC (한국시간 오후 6시)"
-          echo "- **수동 실행**: Actions 탭에서 'Run workflow' 버튼으로 실행 가능"
+          echo
+          echo "### div4u 보안 검사 정보"
+          echo "- 자동 트리거: main/develop 브랜치의 k8s/ 변경 시"
+          echo "- PR 검사: Pull Request 생성 시 자동 실행"
+          echo "- 정기 검사: 매일 09:00 UTC (KST 18:00)"
+          echo "- 수동 실행: Actions 탭 'Run workflow'"
