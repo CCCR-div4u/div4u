@@ -7,3 +7,4 @@ data:
   CORS_ORIGIN: "https://www.div4u.com"
   LOG_LEVEL: "warn"
   ALLOWED_ORIGINS: "https://www.div4u.com"
+  SEOUL_API_KEY: "5358646b57736f6f383357417a544e"
