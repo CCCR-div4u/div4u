@@ -5,14 +5,14 @@ on:
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'k8s/**'
+      - 'k8s-test-scenario/**'
       - '.github/workflows/k8s-security-scan.yaml'
 
   # 브랜치 push 시 실행 (메인/개발/테스트 브랜치)
   push:
-    branches: [ main, develop, 'feature/k8s-security-scan' ]
+    branches: [ main, develop ]
     paths:
-      - 'k8s/**'
+      - 'k8s-test-scenario/**'
       - '.github/workflows/k8s-security-scan.yaml'
 
   # 수동 실행
