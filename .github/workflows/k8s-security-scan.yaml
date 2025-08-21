@@ -81,9 +81,6 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: |
-            **/requirements.txt
-            scripts/requirements.txt
 
       - name: 보안 환경 검증 (Requirements 5.2, 5.3, 7.1)
         if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
