@@ -35,22 +35,6 @@ spec:
   - host: PLACEHOLDER_DOMAIN
     http:
       paths:
-      # Comparison API 경로 (가장 높은 우선순위)
-      - path: /api/comparison
-        pathType: Prefix
-        backend:
-          service:
-            name: div4u-comparison-service
-            port:
-              number: 3002
-      # Backend API 경로 (두 번째 우선순위)
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: div4u-backend-service
-            port:
-              number: 3001
       # 프론트엔드 (SPA) - 가장 낮은 우선순위
       - path: /
         pathType: Prefix
