@@ -3,6 +3,9 @@
 # Stage 1: Build stage
 FROM node:18-alpine AS builder
 
+# cross-spawn 취약점 해결 (CVE-2024-21538)
+RUN npm install -g cross-spawn@7.0.6
+
 # 작업 디렉토리 설정
 WORKDIR /app
 
@@ -34,6 +37,9 @@ RUN npm run copy:server
 
 # Stage 2: BFF Runtime
 FROM node:18-alpine
+
+# cross-spawn 취약점 해결 (CVE-2024-21538)
+RUN npm install -g cross-spawn@7.0.6
 
 # 작업 디렉토리 설정
 WORKDIR /app
