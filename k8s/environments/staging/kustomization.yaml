@@ -18,6 +18,7 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
+- path: patches/imagepullsecrets-staging.yaml
 
 images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend

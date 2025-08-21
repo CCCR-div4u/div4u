@@ -18,6 +18,7 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
+- path: patches/imagepullsecrets-production.yaml
 
 replicas:
 - name: div4u-backend
