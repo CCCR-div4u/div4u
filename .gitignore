@@ -139,6 +139,7 @@ Thumbs.db
 k8s/secrets/
 k8s/*-secret.yaml
 k8s/secret.yaml
+k8s/base/common/harbor-secret.yaml
 
 # Test files
 test-results/

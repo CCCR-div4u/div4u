@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  NODE_ENV: "staging"
+  CORE_API_URL: "http://staging-div4u-backend-service:3001/api"
+  BACKEND_SERVICE_URL: "http://staging-div4u-backend-service:3001"
+  COMPARISON_SERVICE_URL: "http://staging-div4u-comparison-service:3002"
+  CORS_ORIGIN: "https://staging.div4u.com"
+  LOG_LEVEL: "debug"
+  ALLOWED_ORIGINS: "https://staging.div4u.com"
+  SEOUL_API_BASE_URL: "http://openapi.seoul.go.kr:8088"
+  COMPARISON_PORT: "3002"
+  CACHE_TTL_MINUTES: "5"

@@ -2,13 +2,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app-config
-  namespace: div4u
 data:
   # Common
   NODE_ENV: "production"
   
   # Backend
-  PORT: "3001"
   CORS_ORIGIN: "https://www.div4u.com"
   SEOUL_API_BASE_URL: "http://openapi.seoul.go.kr:8088"
   
@@ -28,5 +26,3 @@ data:
   CACHE_TTL_MINUTES: "5"
   ALLOWED_ORIGINS: "https://www.div4u.com"
   LOG_LEVEL: "warn"
-
-# nginx-config ConfigMap 제거됨 - BFF 패턴에서는 불필요
