@@ -66,18 +66,70 @@ class SecurityAnalyzer:
             'UNKNOWN': []
         }
         
+        # Checkov check_id 기반 심각도 매핑
+        severity_mapping = {
+            # Critical - 보안에 심각한 영향을 미치는 이슈들
+            'CKV_K8S_8': 'CRITICAL',   # Liveness Probe 미설정
+            'CKV_K8S_9': 'CRITICAL',   # Readiness Probe 미설정
+            'CKV_K8S_16': 'CRITICAL',  # 컨테이너가 root로 실행
+            'CKV_K8S_17': 'CRITICAL',  # 권한 상승 허용
+            'CKV_K8S_20': 'CRITICAL',  # allowPrivilegeEscalation 미설정
+            'CKV_K8S_25': 'CRITICAL',  # 컨테이너 이미지 태그가 latest
+            'CKV_K8S_30': 'CRITICAL',  # securityContext 미설정
+            'CKV_K8S_37': 'CRITICAL',  # 컨테이너가 특권 모드로 실행
+            'CKV_K8S_40': 'CRITICAL',  # 컨테이너가 root 파일시스템에 쓰기 가능
+            
+            # High - 중요한 보안 이슈들
+            'CKV_K8S_10': 'HIGH',     # CPU 리소스 제한 미설정
+            'CKV_K8S_11': 'HIGH',     # 메모리 리소스 제한 미설정
+            'CKV_K8S_12': 'HIGH',     # CPU 리소스 요청 미설정
+            'CKV_K8S_13': 'HIGH',     # 메모리 리소스 요청 미설정
+            'CKV_K8S_14': 'HIGH',     # 이미지 pull policy가 Always가 아님
+            'CKV_K8S_21': 'HIGH',     # 기본 네임스페이스 사용
+            'CKV_K8S_22': 'HIGH',     # 기본 서비스 계정 사용
+            'CKV_K8S_28': 'HIGH',     # Docker 소켓 마운트
+            'CKV_K8S_29': 'HIGH',     # 루트 파일시스템 마운트
+            'CKV_K8S_31': 'HIGH',     # seccomp 프로파일 미설정
+            'CKV_K8S_35': 'HIGH',     # 컨테이너가 SYS_ADMIN capability 사용
+            'CKV_K8S_38': 'HIGH',     # 서비스 계정 토큰 자동 마운트
+            'CKV_K8S_39': 'HIGH',     # 컨테이너가 NET_RAW capability 사용
+            'CKV_K8S_43': 'HIGH',     # 이미지가 digest로 참조되지 않음
+            
+            # Medium - 보안 강화를 위한 권장사항들
+            'CKV_K8S_15': 'MEDIUM',   # 이미지 레지스트리가 신뢰할 수 없음
+            'CKV_K8S_23': 'MEDIUM',   # hostNetwork 사용
+            'CKV_K8S_24': 'MEDIUM',   # hostPID 사용
+            'CKV_K8S_26': 'MEDIUM',   # 컨테이너가 호스트 IPC 사용
+            'CKV_K8S_27': 'MEDIUM',   # 컨테이너가 호스트 포트 사용
+            'CKV_K8S_32': 'MEDIUM',   # AppArmor 프로파일 미설정
+            'CKV_K8S_33': 'MEDIUM',   # SELinux 옵션 미설정
+            'CKV_K8S_34': 'MEDIUM',   # 컨테이너가 추가 capability 사용
+            'CKV_K8S_36': 'MEDIUM',   # fsGroup 미설정
+            'CKV_K8S_41': 'MEDIUM',   # Service 타입이 NodePort
+            'CKV_K8S_42': 'MEDIUM',   # Service 타입이 LoadBalancer
+            
+            # Low - 모범 사례 및 개선 권장사항들
+            'CKV_K8S_18': 'LOW',      # 컨테이너 이름이 기본값
+            'CKV_K8S_19': 'LOW',      # 라벨 미설정
+            'CKV_K8S_44': 'LOW',      # 리소스 쿼터 미설정
+            'CKV_K8S_45': 'LOW',      # 네트워크 정책 미설정
+        }
+        
         for check in failed_checks:
-            severity = check.get('severity') or 'UNKNOWN'
-            if isinstance(severity, str):
-                severity = severity.upper()
-            else:
-                severity = 'UNKNOWN'
-            if severity not in severity_buckets:
-                severity = 'UNKNOWN'
+            check_id = check.get('check_id', '')
+            
+            # check_id 기반으로 심각도 결정
+            severity = severity_mapping.get(check_id, 'MEDIUM')  # 기본값을 MEDIUM으로 설정
+            
+            # 기존 severity 필드가 있다면 우선 사용
+            if check.get('severity'):
+                existing_severity = str(check.get('severity')).upper()
+                if existing_severity in severity_buckets:
+                    severity = existing_severity
             
             # OpenAI 전송용 데이터 정제 (소스 코드 제외 - Requirement 5.1)
             sanitized_check = {
-                'check_id': check.get('check_id', ''),
+                'check_id': check_id,
                 'check_name': check.get('check_name', ''),
                 'severity': severity,
                 'file_path': check.get('file_path', ''),
