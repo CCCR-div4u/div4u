@@ -567,51 +567,51 @@ jobs:
 
           # SARIF 파일 유효성 검사 및 메타데이터 추가
           python3 -c "
-          import json
-          import sys
-          try:
-              with open('checkov-results.sarif', 'r') as f:
-                  sarif_data = json.load(f)
-              
-              # 기본 구조 검증
-              if 'runs' not in sarif_data:
-                  print('❌ SARIF 파일 구조 오류: runs 섹션이 없습니다.')
-                  sys.exit(1)
-              
-              # 메타데이터 추가
-              for run in sarif_data['runs']:
-                  if 'properties' not in run:
-                      run['properties'] = {}
-                  
-                  run['properties'].update({
-                      'repository': '${{ github.repository }}',
-                      'branch': '${{ github.ref_name }}',
-                      'commit': '${{ github.sha }}',
-                      'workflow_run': '${{ github.run_id }}',
-                      'scan_type': 'kubernetes',
-                      'scan_directory': 'k8s-test-scenario',
-                      'scan_time': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
-                      'total_issues': '${{ steps.issue_count.outputs.total_issues || 0 }}',
-                      'critical_count': '${{ steps.issue_count.outputs.critical_count || 0 }}',
-                      'high_count': '${{ steps.issue_count.outputs.high_count || 0 }}',
-                      'medium_count': '${{ steps.issue_count.outputs.medium_count || 0 }}',
-                      'low_count': '${{ steps.issue_count.outputs.low_count || 0 }}'
-                  })
-              
-              # 업데이트된 SARIF 파일 저장
-              with open('checkov-results.sarif', 'w') as f:
-                  json.dump(sarif_data, f, indent=2)
-              
-              print('✅ SARIF 파일 검증 및 메타데이터 추가 완료')
-              print(f'📊 결과 수: {len(sarif_data[\"runs\"][0].get(\"results\", []))}개')
-              
-          except json.JSONDecodeError as e:
-              print(f'❌ SARIF 파일 JSON 파싱 오류: {e}')
-              sys.exit(1)
-          except Exception as e:
-              print(f'❌ SARIF 파일 처리 오류: {e}')
-              sys.exit(1)
-          "
+import json
+import sys
+try:
+    with open('checkov-results.sarif', 'r') as f:
+        sarif_data = json.load(f)
+    
+    # 기본 구조 검증
+    if 'runs' not in sarif_data:
+        print('❌ SARIF 파일 구조 오류: runs 섹션이 없습니다.')
+        sys.exit(1)
+    
+    # 메타데이터 추가
+    for run in sarif_data['runs']:
+        if 'properties' not in run:
+            run['properties'] = {}
+        
+        run['properties'].update({
+            'repository': '${{ github.repository }}',
+            'branch': '${{ github.ref_name }}',
+            'commit': '${{ github.sha }}',
+            'workflow_run': '${{ github.run_id }}',
+            'scan_type': 'kubernetes',
+            'scan_directory': 'k8s-test-scenario',
+            'scan_time': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+            'total_issues': '${{ steps.issue_count.outputs.total_issues || 0 }}',
+            'critical_count': '${{ steps.issue_count.outputs.critical_count || 0 }}',
+            'high_count': '${{ steps.issue_count.outputs.high_count || 0 }}',
+            'medium_count': '${{ steps.issue_count.outputs.medium_count || 0 }}',
+            'low_count': '${{ steps.issue_count.outputs.low_count || 0 }}'
+        })
+    
+    # 업데이트된 SARIF 파일 저장
+    with open('checkov-results.sarif', 'w') as f:
+        json.dump(sarif_data, f, indent=2)
+    
+    print('✅ SARIF 파일 검증 및 메타데이터 추가 완료')
+    print(f'📊 결과 수: {len(sarif_data[\"runs\"][0].get(\"results\", []))}개')
+    
+except json.JSONDecodeError as e:
+    print(f'❌ SARIF 파일 JSON 파싱 오류: {e}')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ SARIF 파일 처리 오류: {e}')
+    sys.exit(1)
+"
 
       - name: 아티팩트 메타데이터 생성 (Requirements 7.4)
         if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
