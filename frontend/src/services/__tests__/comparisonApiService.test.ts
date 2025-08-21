@@ -61,7 +61,7 @@ describe('ComparisonApiService', () => {
       expect(result.data!.comparisons).toHaveLength(2);
       expect(result.data!.analysis.recommendation.bestChoice).toBe('홍대 관광특구');
       
-      expect(mockedApiClient.post).toHaveBeenCalledWith('/comparison/compare', {
+      expect(mockedApiClient.post).toHaveBeenCalledWith('/compare', {
         locations: ['홍대', '명동']
       });
     });
@@ -124,7 +124,7 @@ describe('ComparisonApiService', () => {
         }
       });
 
-      expect(mockedApiClient.post).toHaveBeenCalledWith('/comparison/compare', {
+      expect(mockedApiClient.post).toHaveBeenCalledWith('/compare', {
         locations: ['홍대'],
         options: {
           includeRecommendation: true,
