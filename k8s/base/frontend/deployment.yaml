@@ -2,10 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: div4u-frontend
-  namespace: div4u
   labels:
     app: div4u-frontend
-    environment: production
 spec:
   replicas: 1
   strategy:
@@ -20,17 +18,14 @@ spec:
     metadata:
       labels:
         app: div4u-frontend
-        environment: production
     spec:
       imagePullSecrets:
       - name: harbor-registry-secret
       containers:
       - name: frontend
-        image: harbor.bluesunnywings.com/div4u/div4u-frontend:236a8d5613e327b9657447db0b6ed812085d9692
-        imagePullPolicy: Always
+        image: harbor.bluesunnywings.com/div4u/div4u-frontend:latest
         ports:
         - containerPort: 3000
-          name: http
         env:
         - name: NODE_ENV
           valueFrom:
@@ -64,38 +59,10 @@ spec:
             configMapKeyRef:
               name: app-config
               key: VITE_APP_VERSION
-        # BFF 방식에서는 nginx-config 불필요
         resources:
           requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
             memory: "256Mi"
             cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 1001
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
-      # BFF 방식에서는 nginx-config volume 불필요
-      restartPolicy: Always
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        fsGroup: 1001

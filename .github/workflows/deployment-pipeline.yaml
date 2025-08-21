@@ -2,6 +2,20 @@ name: CI/CD Pipeline
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      skip_approval:
+        description: 'Skip manual approval for testing'
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -12,8 +26,13 @@ on:
       - 'comparison/**'
 
 env:
-  REGISTRY: harbor.bluesunnywings.com/div4u
+  REGISTRY_BASE: harbor.bluesunnywings.com
+  # 수동 실행 시 입력값 우선, 자동 실행 시 브랜치 기반
+  TARGET_ENV: ${{ github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+  REGISTRY: ${{ github.event.inputs.environment == 'production' && 'harbor.bluesunnywings.com/div4u-production' || github.event.inputs.environment == 'staging' && 'harbor.bluesunnywings.com/div4u-staging' || github.ref_name == 'main' && 'harbor.bluesunnywings.com/div4u-production' || 'harbor.bluesunnywings.com/div4u-staging' }}
   IMAGE_TAG: ${{ github.sha }}
+  BUILD_NUMBER: ${{ github.run_number }}
+  TIMESTAMP: ${{ github.run_id }}
 
 jobs:
   build:
@@ -191,7 +210,7 @@ jobs:
     name: Security Review & Deployment Approval
     runs-on: ubuntu-latest
     needs: security-scan
-    if: always()
+    if: always() && github.event.inputs.skip_approval != 'true'
     permissions:
       contents: read
       actions: read
@@ -452,7 +471,8 @@ jobs:
   push-images:
     name: Push Images
     runs-on: ubuntu-latest
-    needs: slack-approval
+    needs: [security-scan, slack-approval]
+    if: always() && (needs.slack-approval.result == 'success' || (github.event.inputs.skip_approval && needs.security-scan.result == 'success'))
     permissions:
       contents: read
       packages: write
@@ -499,6 +519,7 @@ jobs:
     name: Update K8s Manifests
     runs-on: ubuntu-latest
     needs: push-images
+    if: always() && needs.push-images.result == 'success'
     permissions:
       contents: write
     
@@ -510,14 +531,45 @@ jobs:
 
       - name: Update deployment manifests
         run: |
-          sed -i "s|image: ${{ env.REGISTRY }}/div4u-frontend:.*|image: ${{ env.REGISTRY }}/div4u-frontend:${{ env.IMAGE_TAG }}|" k8s/frontend/frontend-deployment.yaml
-          sed -i "s|image: ${{ env.REGISTRY }}/div4u-backend:.*|image: ${{ env.REGISTRY }}/div4u-backend:${{ env.IMAGE_TAG }}|" k8s/backend/backend-deployment.yaml
-          sed -i "s|image: ${{ env.REGISTRY }}/div4u-comparison:.*|image: ${{ env.REGISTRY }}/div4u-comparison:${{ env.IMAGE_TAG }}|" k8s/comparison/comparison-deployment.yaml
+          # Determine environment (manual input or branch-based)
+          TARGET_ENV="${{ env.TARGET_ENV }}"
+          
+          if [[ "$TARGET_ENV" == "staging" ]]; then
+            ENV_PATH="k8s/environments/staging"
+            echo "Updating staging environment with tag: ${{ env.IMAGE_TAG }}"
+          elif [[ "$TARGET_ENV" == "production" ]]; then
+            ENV_PATH="k8s/environments/production"
+            echo "Updating production environment with tag: ${{ env.IMAGE_TAG }}"
+          else
+            echo "Unknown environment: $TARGET_ENV"
+            exit 1
+          fi
+          
+          # Update kustomization.yaml with new image tags
+          cd $ENV_PATH
+          
+          # Update all service image tags
+          sed -i "s|newTag: .*|newTag: ${{ env.IMAGE_TAG }}|g" kustomization.yaml
+          
+          # Verify the changes
+          echo "Updated kustomization.yaml:"
+          cat kustomization.yaml
 
       - name: Commit and push changes
         run: |
           git config --global user.name "rustzh"
           git config --global user.email "soonso00@naver.com"
-          git add k8s/*/
-          git commit -m "Update image tags to ${{ env.IMAGE_TAG }}" || exit 0
+          
+          # Add environment-specific directory
+          TARGET_ENV="${{ env.TARGET_ENV }}"
+          git add k8s/environments/$TARGET_ENV/
+          
+          # Create commit message
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            COMMIT_MSG="ci($TARGET_ENV): manual update image tags to ${{ env.IMAGE_TAG }}"
+          else
+            COMMIT_MSG="ci($TARGET_ENV): update image tags to ${{ env.IMAGE_TAG }}"
+          fi
+          
+          git commit -m "$COMMIT_MSG" || exit 0
           git push origin ${{ github.ref_name }}

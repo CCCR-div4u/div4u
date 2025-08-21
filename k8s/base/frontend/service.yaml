@@ -2,15 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: div4u-frontend-service
-  namespace: div4u
   labels:
     app: div4u-frontend
 spec:
   selector:
     app: div4u-frontend
   ports:
-  - name: http
-    port: 80
+  - port: 80
     targetPort: 3000
     protocol: TCP
   type: ClusterIP
