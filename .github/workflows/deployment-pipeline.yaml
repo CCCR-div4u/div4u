@@ -2,6 +2,20 @@ name: CI/CD Pipeline
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      skip_approval:
+        description: 'Skip manual approval for testing'
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
@@ -13,7 +27,9 @@ on:
 
 env:
   REGISTRY_BASE: harbor.bluesunnywings.com
-  REGISTRY: ${{ github.ref_name == 'main' && 'harbor.bluesunnywings.com/div4u-production' || github.ref_name == 'develop' && 'harbor.bluesunnywings.com/div4u-staging' || 'harbor.bluesunnywings.com/div4u' }}
+  # 수동 실행 시 입력값 우선, 자동 실행 시 브랜치 기반
+  TARGET_ENV: ${{ github.event.inputs.environment || (github.ref_name == 'main' && 'production' || 'staging') }}
+  REGISTRY: ${{ github.event.inputs.environment == 'production' && 'harbor.bluesunnywings.com/div4u-production' || github.event.inputs.environment == 'staging' && 'harbor.bluesunnywings.com/div4u-staging' || github.ref_name == 'main' && 'harbor.bluesunnywings.com/div4u-production' || 'harbor.bluesunnywings.com/div4u-staging' }}
   IMAGE_TAG: ${{ github.sha }}
   BUILD_NUMBER: ${{ github.run_number }}
   TIMESTAMP: ${{ github.run_id }}
@@ -194,7 +210,7 @@ jobs:
     name: Security Review & Deployment Approval
     runs-on: ubuntu-latest
     needs: security-scan
-    if: always()
+    if: always() && !github.event.inputs.skip_approval
     permissions:
       contents: read
       actions: read
@@ -455,7 +471,8 @@ jobs:
   push-images:
     name: Push Images
     runs-on: ubuntu-latest
-    needs: slack-approval
+    needs: ${{ github.event.inputs.skip_approval && 'security-scan' || 'slack-approval' }}
+    if: always() && (needs.slack-approval.result == 'success' || github.event.inputs.skip_approval)
     permissions:
       contents: read
       packages: write
@@ -513,16 +530,18 @@ jobs:
 
       - name: Update deployment manifests
         run: |
-          # Determine environment based on branch
-          if [[ "${{ github.ref_name }}" == "develop" ]]; then
+          # Determine environment (manual input or branch-based)
+          TARGET_ENV="${{ env.TARGET_ENV }}"
+          
+          if [[ "$TARGET_ENV" == "staging" ]]; then
             ENV_PATH="k8s/environments/staging"
             echo "Updating staging environment with tag: ${{ env.IMAGE_TAG }}"
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          elif [[ "$TARGET_ENV" == "production" ]]; then
             ENV_PATH="k8s/environments/production"
             echo "Updating production environment with tag: ${{ env.IMAGE_TAG }}"
           else
-            echo "Branch ${{ github.ref_name }} not configured for deployment"
-            exit 0
+            echo "Unknown environment: $TARGET_ENV"
+            exit 1
           fi
           
           # Update kustomization.yaml with new image tags
@@ -540,13 +559,15 @@ jobs:
           git config --global user.name "rustzh"
           git config --global user.email "soonso00@naver.com"
           
-          # Add only the specific environment directory
-          if [[ "${{ github.ref_name }}" == "develop" ]]; then
-            git add k8s/environments/staging/
-            COMMIT_MSG="ci(staging): update image tags to ${{ env.IMAGE_TAG }}"
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
-            git add k8s/environments/production/
-            COMMIT_MSG="ci(production): update image tags to ${{ env.IMAGE_TAG }}"
+          # Add environment-specific directory
+          TARGET_ENV="${{ env.TARGET_ENV }}"
+          git add k8s/environments/$TARGET_ENV/
+          
+          # Create commit message
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            COMMIT_MSG="ci($TARGET_ENV): manual update image tags to ${{ env.IMAGE_TAG }}"
+          else
+            COMMIT_MSG="ci($TARGET_ENV): update image tags to ${{ env.IMAGE_TAG }}"
           fi
           
           git commit -m "$COMMIT_MSG" || exit 0

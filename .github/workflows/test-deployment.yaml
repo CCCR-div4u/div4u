@@ -1,0 +1,63 @@
+name: Test Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      image_tag:
+        description: 'Image tag to deploy (optional, defaults to commit hash)'
+        required: false
+        type: string
+
+env:
+  REGISTRY_BASE: harbor.bluesunnywings.com
+  REGISTRY: ${{ github.event.inputs.environment == 'production' && 'harbor.bluesunnywings.com/div4u-production' || 'harbor.bluesunnywings.com/div4u-staging' }}
+  IMAGE_TAG: ${{ github.event.inputs.image_tag || github.sha }}
+
+jobs:
+  test-deploy:
+    name: Test Deployment
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update deployment manifests
+        run: |
+          ENV_PATH="k8s/environments/${{ github.event.inputs.environment }}"
+          echo "🚀 Testing deployment to ${{ github.event.inputs.environment }} environment"
+          echo "📦 Using image tag: ${{ env.IMAGE_TAG }}"
+          
+          cd $ENV_PATH
+          sed -i "s|newTag: .*|newTag: ${{ env.IMAGE_TAG }}|g" kustomization.yaml
+          
+          echo "✅ Updated kustomization.yaml:"
+          cat kustomization.yaml
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "rustzh"
+          git config --global user.email "soonso00@naver.com"
+          
+          git add k8s/environments/${{ github.event.inputs.environment }}/
+          git commit -m "test(${{ github.event.inputs.environment }}): deploy image tag ${{ env.IMAGE_TAG }}" || exit 0
+          git push origin ${{ github.ref_name }}
+
+      - name: Summary
+        run: |
+          echo "🎉 Test deployment completed!"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Image tag: ${{ env.IMAGE_TAG }}"
+          echo "ArgoCD will sync automatically within 3 minutes"
