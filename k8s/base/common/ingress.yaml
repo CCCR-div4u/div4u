@@ -13,7 +13,7 @@ metadata:
     # SSL/TLS 설정 (AWS Certificate Manager ARN 사용)
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:219967435143:certificate/8f813968-02ad-4113-836b-301b42d61265
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:219967435143:certificate/f11a303c-a7df-437a-ae64-28843851eaa5
     
     # 헬스체크 설정
     alb.ingress.kubernetes.io/healthcheck-protocol: HTTP

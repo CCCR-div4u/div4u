@@ -14,14 +14,54 @@ spec:
       labels:
         app: div4u-comparison
     spec:
+      imagePullSecrets:
+      - name: harbor-registry-secret
       containers:
       - name: comparison
         image: harbor.bluesunnywings.com/div4u/div4u-comparison:latest
         ports:
         - containerPort: 3002
-        envFrom:
-        - configMapRef:
-            name: app-config
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: COMPARISON_PORT
+        - name: SEOUL_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: seoul-api-secret
+              key: seoul-api-key
+        - name: SEOUL_API_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: SEOUL_API_BASE_URL
+        - name: ALLOWED_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ALLOWED_ORIGINS
+        - name: CACHE_TTL_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CACHE_TTL_MINUTES
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: LOG_LEVEL
+        - name: CORE_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: CORE_API_URL
         resources:
           requests:
             memory: "256Mi"

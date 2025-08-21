@@ -9,6 +9,6 @@ spec:
     app: div4u-frontend
   ports:
   - port: 80
-    targetPort: 80
+    targetPort: 3000
     protocol: TCP
   type: ClusterIP
