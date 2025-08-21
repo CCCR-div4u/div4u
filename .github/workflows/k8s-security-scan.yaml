@@ -184,15 +184,15 @@ jobs:
         if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         run: |
           echo "🔍 Kubernetes 보안 스캔을 시작합니다..."
-          echo "📁 스캔 대상: div4u/k8s-test-scenario 디렉터리"
+          echo "📁 스캔 대상: k8s-test-scenario 디렉터리"
 
           # 디렉터리 존재 확인 (Requirement 7.1)
-          if [ ! -d "div4u/k8s-test-scenario" ]; then
-            echo "❌ div4u/k8s-test-scenario 디렉터리를 찾을 수 없습니다."
+          if [ ! -d "k8s-test-scenario" ]; then
+            echo "❌ k8s-test-scenario 디렉터리를 찾을 수 없습니다."
             echo "📁 현재 디렉터리 구조:"
             ls -la
             echo "🔧 기본 테스트 디렉터리를 생성합니다..."
-            mkdir -p div4u/k8s-test-scenario
+            mkdir -p k8s-test-scenario
             echo "⚠️ 스캔할 파일이 없으므로 기본 결과를 생성합니다."
           fi
 
@@ -205,14 +205,14 @@ jobs:
           fi
 
           # 스캔 대상 파일 확인
-          YAML_FILES=$(find div4u/k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | wc -l)
-          JSON_FILES=$(find div4u/k8s-test-scenario -type f -name "*.json" 2>/dev/null | wc -l)
+          YAML_FILES=$(find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | wc -l)
+          JSON_FILES=$(find k8s-test-scenario -type f -name "*.json" 2>/dev/null | wc -l)
           TOTAL_FILES=$((YAML_FILES + JSON_FILES))
           echo "📋 발견된 파일: YAML ${YAML_FILES}개, JSON ${JSON_FILES}개 (총 ${TOTAL_FILES}개)"
 
           # 대용량 파일 확인 및 경고 (5MB 이상)
           echo "🔍 대용량 파일 검사..."
-          LARGE_FILES=$(find div4u/k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) | xargs ls -la 2>/dev/null | awk '$5 > 5242880 {print $9, $5}' || true)
+          LARGE_FILES=$(find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) | xargs ls -la 2>/dev/null | awk '$5 > 5242880 {print $9, $5}' || true)
           if [ -n "$LARGE_FILES" ]; then
             echo "⚠️ 대용량 파일 발견 (5MB 이상):"
             echo "$LARGE_FILES"
@@ -221,7 +221,7 @@ jobs:
 
           if [ "$TOTAL_FILES" -gt 0 ]; then
             echo "📋 스캔 대상 파일 목록 (최대 10개):"
-            find div4u/k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) | head -10
+            find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) | head -10
           else
             echo "⚠️ 스캔할 파일이 없습니다."
           fi
@@ -240,7 +240,7 @@ jobs:
             
             # 성능 최적화 옵션 설정
             local checkov_args=(
-              --directory div4u/k8s-test-scenario
+              --directory k8s-test-scenario
               --framework kubernetes
               --output "$output_format"
               --quiet
@@ -266,11 +266,18 @@ jobs:
             while [ $retry_count -lt $max_retries ]; do
               echo "🔍 Checkov 실행 ($output_format 형식, 시도 $((retry_count + 1))/$max_retries)"
               echo "⚡ 성능 최적화 옵션: 타임아웃 제어, 파일 출력"
+              echo "📋 실행 명령어: checkov ${checkov_args[*]}"
+              echo "📁 현재 디렉터리: $(pwd)"
+              echo "📁 스캔 대상 디렉터리 확인:"
+              ls -la k8s-test-scenario/ 2>/dev/null || echo "k8s-test-scenario 디렉터리가 없습니다"
               
               if checkov "${checkov_args[@]}"; then
                 echo "✅ Checkov $output_format 출력 성공"
+                echo "📄 출력 파일 확인: $output_file"
+                ls -la "$output_file" 2>/dev/null || echo "출력 파일이 생성되지 않았습니다"
                 return 0
               else
+                echo "❌ Checkov 실행 실패 (종료 코드: $?)"
                 retry_count=$((retry_count + 1))
                 if [ $retry_count -lt $max_retries ]; then
                   echo "⚠️ Checkov 실행 실패 - 3초 후 재시도..."
@@ -286,6 +293,32 @@ jobs:
           # JSON 형식으로 스캔 실행
           if ! run_checkov "json" "checkov-results.json"; then
             echo "⚠️ Checkov JSON 출력 실패 - 기본 JSON 파일 생성"
+          fi
+          
+          # 디버깅: 생성된 파일들 확인
+          echo "🔍 현재 디렉터리의 모든 파일:"
+          ls -la
+          echo ""
+          echo "🔍 checkov 관련 파일들:"
+          ls -la checkov* 2>/dev/null || echo "checkov 결과 파일이 없습니다"
+          echo ""
+          
+          # JSON 파일 내용 확인
+          if [ -f "checkov-results.json" ]; then
+            echo "📄 checkov-results.json 파일 정보:"
+            echo "  - 크기: $(wc -c < checkov-results.json) bytes"
+            echo "  - 줄 수: $(wc -l < checkov-results.json) lines"
+            echo "📄 checkov-results.json 전체 내용:"
+            cat checkov-results.json
+            echo ""
+            echo "📄 JSON 유효성 검사:"
+            if python3 -m json.tool checkov-results.json > /dev/null 2>&1; then
+              echo "✅ 유효한 JSON 형식입니다"
+            else
+              echo "❌ 유효하지 않은 JSON 형식입니다"
+            fi
+          else
+            echo "❌ checkov-results.json 파일이 존재하지 않습니다"
           fi
 
           # Checkov가 디렉터리 구조로 생성한 경우 파일 이동
@@ -454,7 +487,7 @@ jobs:
 
             ### 🔗 관련 링크
             - [워크플로 실행 결과](${runUrl})
-            - [k8s-test-scenario 디렉터리](${context.payload.repository.html_url}/tree/${context.ref.replace('refs/heads/', '')}/div4u/k8s-test-scenario)
+            - [k8s-test-scenario 디렉터리](${context.payload.repository.html_url}/tree/${context.ref.replace('refs/heads/', '')}/k8s-test-scenario)
             - [Checkov Kubernetes 문서](https://www.checkov.io/5.Policy%20Index/kubernetes.html)
             - [Kubernetes 보안 가이드](https://kubernetes.io/docs/concepts/security/)
 
@@ -523,7 +556,7 @@ jobs:
                   "commit": "${{ github.sha }}",
                   "workflow_run": "${{ github.run_id }}",
                   "scan_type": "kubernetes",
-                  "scan_directory": "div4u/k8s-test-scenario",
+                  "scan_directory": "k8s-test-scenario",
                   "scan_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
                 }
               }
@@ -556,7 +589,7 @@ jobs:
                       'commit': '${{ github.sha }}',
                       'workflow_run': '${{ github.run_id }}',
                       'scan_type': 'kubernetes',
-                      'scan_directory': 'div4u/k8s-test-scenario',
+                      'scan_directory': 'k8s-test-scenario',
                       'scan_time': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
                       'total_issues': '${{ steps.issue_count.outputs.total_issues || 0 }}',
                       'critical_count': '${{ steps.issue_count.outputs.critical_count || 0 }}',
@@ -586,7 +619,7 @@ jobs:
           echo "📝 아티팩트 메타데이터 생성..."
 
           # 스캔 대상 파일 목록 생성
-          SCANNED_FILES=$(find div4u/k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | jq -R . | jq -s . || echo '[]')
+          SCANNED_FILES=$(find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | jq -R . | jq -s . || echo '[]')
 
           # 스캔 메타데이터 파일 생성
           cat > scan-metadata.json << EOF
@@ -599,7 +632,7 @@ jobs:
               "workflow_run_id": "${{ github.run_id }}",
               "workflow_run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               "scan_type": "kubernetes",
-              "scan_directory": "div4u/k8s-test-scenario",
+              "scan_directory": "k8s-test-scenario",
               "scan_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
               "trigger_event": "${{ github.event_name }}",
               "trigger_reason": "${{ steps.reason.outputs.reason }}"
@@ -613,7 +646,7 @@ jobs:
               "priority": "${{ steps.issue_count.outputs.priority || 'NONE' }}"
             },
             "scan_scope": {
-              "target_directory": "div4u/k8s-test-scenario",
+              "target_directory": "k8s-test-scenario",
               "scanned_files": $SCANNED_FILES,
               "file_count": $(echo '$SCANNED_FILES' | jq length)
             },
@@ -790,7 +823,7 @@ jobs:
             echo "📋 실패 사유: $FAIL_REASON"
             echo ""
             echo "💡 해결 방법:"
-            echo "  1. div4u/k8s-test-scenario 디렉터리의 보안 이슈를 해결하세요"
+            echo "  1. k8s-test-scenario 디렉터리의 보안 이슈를 해결하세요"
             echo "  2. 이슈 해결 후 다시 커밋하거나 PR을 업데이트하세요"
             echo "  3. 또는 FAIL_ON_SEVERITY 환경변수를 조정하세요"
             echo ""
@@ -809,8 +842,8 @@ jobs:
       - name: 변경사항 없음 처리
         if: steps.changes.outputs.k8s != 'true' && github.event_name != 'workflow_dispatch' && github.event_name != 'schedule'
         run: |
-          echo "⏭️ div4u/k8s-test-scenario 디렉터리에 변경사항이 없습니다."
-          echo "📁 모니터링 대상: div4u/k8s-test-scenario/**"
+          echo "⏭️ k8s-test-scenario 디렉터리에 변경사항이 없습니다."
+          echo "📁 모니터링 대상: k8s-test-scenario/**"
           echo "::notice::변경사항 없음 - 보안 스캔을 건너뜁니다."
 
       - name: 실행 완료 요약
@@ -825,4 +858,4 @@ jobs:
           echo ""
           echo "🔗 추가 정보:"
           echo "  - 워크플로 실행: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          echo "  - 스캔 대상: div4u/k8s-test-scenario 디렉터리"
+          echo "  - 스캔 대상: k8s-test-scenario 디렉터리"
