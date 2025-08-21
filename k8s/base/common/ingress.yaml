@@ -2,10 +2,8 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: div4u-ingress
-  namespace: div4u
   labels:
     app: div4u-ingress
-    environment: production
   annotations:
     # AWS Load Balancer Controller 설정
     alb.ingress.kubernetes.io/scheme: internet-facing
@@ -26,9 +24,6 @@ metadata:
     alb.ingress.kubernetes.io/healthy-threshold-count: '2'
     alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
     
-    # 로드밸런서 설정
-    alb.ingress.kubernetes.io/load-balancer-name: div4u-alb
-    
     # 추가 설정
     alb.ingress.kubernetes.io/backend-protocol: HTTP
     alb.ingress.kubernetes.io/success-codes: '200'
@@ -36,37 +31,8 @@ metadata:
 spec:
   ingressClassName: alb
   rules:
-  # www.div4u.com 메인 도메인
-  - host: www.div4u.com
-    http:
-      paths:
-      # Comparison API 경로 (가장 높은 우선순위 - 더 구체적인 경로)
-      - path: /api/comparison
-        pathType: Prefix
-        backend:
-          service:
-            name: div4u-comparison-service
-            port:
-              number: 3002
-      # Backend API 경로 (두 번째 우선순위)
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: div4u-backend-service
-            port:
-              number: 3001
-      # 프론트엔드 (SPA) - 가장 낮은 우선순위
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: div4u-frontend-service
-            port:
-              number: 80
-  
-  # div4u.com -> www.div4u.com 리다이렉트
-  - host: div4u.com
+  # 메인 도메인 (환경별로 패치됨)
+  - host: PLACEHOLDER_DOMAIN
     http:
       paths:
       # Comparison API 경로 (가장 높은 우선순위)
@@ -85,7 +51,7 @@ spec:
             name: div4u-backend-service
             port:
               number: 3001
-      # 프론트엔드 (SPA)
+      # 프론트엔드 (SPA) - 가장 낮은 우선순위
       - path: /
         pathType: Prefix
         backend:
