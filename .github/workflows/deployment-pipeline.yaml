@@ -519,6 +519,7 @@ jobs:
     name: Update K8s Manifests
     runs-on: ubuntu-latest
     needs: push-images
+    if: always() && needs.push-images.result == 'success'
     permissions:
       contents: write
     
