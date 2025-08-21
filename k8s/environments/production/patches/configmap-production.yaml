@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://www.div4u.com"
+  LOG_LEVEL: "warn"
+  ALLOWED_ORIGINS: "https://www.div4u.com"

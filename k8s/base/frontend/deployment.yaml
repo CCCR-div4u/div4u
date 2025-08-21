@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: div4u-frontend
+  labels:
+    app: div4u-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: div4u-frontend
+  template:
+    metadata:
+      labels:
+        app: div4u-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: harbor.bluesunnywings.com/div4u/div4u-frontend:latest
+        ports:
+        - containerPort: 80
+        envFrom:
+        - configMapRef:
+            name: app-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
