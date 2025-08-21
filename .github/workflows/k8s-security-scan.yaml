@@ -148,18 +148,6 @@ jobs:
         run: |
           echo "🔧 Checkov 및 의존성 설치 중..."
           
-          # 네트워크 연결 상태 확인 (Requirement 7.3)
-          echo "🌐 네트워크 연결 상태 확인..."
-          if ! ping -c 1 pypi.org > /dev/null 2>&1; then
-            echo "⚠️ PyPI 서버 연결 실패 - 재시도 중..."
-            sleep 5
-            if ! ping -c 1 pypi.org > /dev/null 2>&1; then
-              echo "❌ PyPI 서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요."
-              exit 1
-            fi
-          fi
-          echo "✅ 네트워크 연결 확인 완료"
-          
           # pip 업그레이드 및 패키지 설치 (재시도 로직 포함)
           MAX_RETRIES=3
           RETRY_COUNT=0
@@ -167,16 +155,22 @@ jobs:
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "📦 패키지 설치 시도 $((RETRY_COUNT + 1))/$MAX_RETRIES"
             
-            if pip install --upgrade pip && pip install checkov requests; then
+            if pip install --upgrade pip --timeout=60 --retries=3 && \
+               pip install checkov requests openai --timeout=60 --retries=3; then
               echo "✅ 패키지 설치 성공"
               break
             else
               RETRY_COUNT=$((RETRY_COUNT + 1))
               if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "⚠️ 패키지 설치 실패 - 5초 후 재시도..."
-                sleep 5
+                echo "⚠️ 패키지 설치 실패 - 10초 후 재시도..."
+                sleep 10
               else
                 echo "❌ 패키지 설치 최종 실패"
+                echo "🔍 pip 설정 확인:"
+                pip config list || true
+                echo "🔍 Python 환경 확인:"
+                python --version
+                pip --version
                 exit 1
               fi
             fi
