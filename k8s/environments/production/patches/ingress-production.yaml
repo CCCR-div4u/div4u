@@ -7,20 +7,6 @@ spec:
   - host: www.div4u.com
     http:
       paths:
-      - path: /api/comparison
-        pathType: Prefix
-        backend:
-          service:
-            name: prod-div4u-comparison-service
-            port:
-              number: 3002
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: prod-div4u-backend-service
-            port:
-              number: 3001
       - path: /
         pathType: Prefix
         backend:
@@ -31,20 +17,6 @@ spec:
   - host: div4u.com
     http:
       paths:
-      - path: /api/comparison
-        pathType: Prefix
-        backend:
-          service:
-            name: prod-div4u-comparison-service
-            port:
-              number: 3002
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: prod-div4u-backend-service
-            port:
-              number: 3001
       - path: /
         pathType: Prefix
         backend:
