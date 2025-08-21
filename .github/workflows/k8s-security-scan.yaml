@@ -238,12 +238,10 @@ jobs:
               --directory k8s-test-scenario
               --framework kubernetes
               --output "$output_format"
-              --output-file-path .
-              --file-output-name "$output_file"
+              --output-file "$output_file"
               --quiet
               --compact
               --soft-fail
-              --parallel
             )
             
             # 대용량 파일이 있는 경우 추가 최적화
