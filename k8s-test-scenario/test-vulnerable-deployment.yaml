@@ -98,3 +98,4 @@ data:
   database_password: "admin123"  # 취약점 21: ConfigMap에 패스워드 저장
   api_secret: "secret-key-123"   # 취약점 22: ConfigMap에 시크릿 저장
   debug_mode: "true"             # 취약점 23: 프로덕션에서 디버그 모드
+  test_trigger: "workflow-test"  # 워크플로우 테스트 트리거
