@@ -233,12 +233,16 @@ jobs:
             local max_retries=2
             local retry_count=0
             
+            # 기존 파일/디렉터리 정리
+            if [ -e "$output_file" ]; then
+              rm -rf "$output_file"
+            fi
+            
             # 성능 최적화 옵션 설정
             local checkov_args=(
               --directory k8s-test-scenario
               --framework kubernetes
               --output "$output_format"
-              --output-file "$output_file"
               --quiet
               --compact
               --soft-fail
@@ -256,9 +260,12 @@ jobs:
               echo "⚡ 다수 파일 감지 - 배치 처리 모드 활성화"
             fi
             
+            # 성능 최적화 옵션에 --output-file 추가
+            checkov_args+=(--output-file "$output_file")
+            
             while [ $retry_count -lt $max_retries ]; do
               echo "🔍 Checkov 실행 ($output_format 형식, 시도 $((retry_count + 1))/$max_retries)"
-              echo "⚡ 성능 최적화 옵션: 병렬 처리, 타임아웃 제어"
+              echo "⚡ 성능 최적화 옵션: 타임아웃 제어, 파일 출력"
               
               if checkov "${checkov_args[@]}"; then
                 echo "✅ Checkov $output_format 출력 성공"
@@ -281,9 +288,27 @@ jobs:
             echo "⚠️ Checkov JSON 출력 실패 - 기본 JSON 파일 생성"
           fi
           
+          # Checkov가 디렉터리 구조로 생성한 경우 파일 이동
+          if [ -d "checkov-results.json" ] && [ -f "checkov-results.json/results_json.json" ]; then
+            echo "🔄 Checkov JSON 결과 파일 이동 중..."
+            mv "checkov-results.json/results_json.json" "checkov-results.json.tmp"
+            rm -rf "checkov-results.json"
+            mv "checkov-results.json.tmp" "checkov-results.json"
+            echo "✅ JSON 파일 이동 완료"
+          fi
+          
           # SARIF 형식으로 스캔 실행
           if ! run_checkov "sarif" "checkov-results.sarif"; then
             echo "⚠️ Checkov SARIF 출력 실패 - 기본 SARIF 파일은 나중에 생성됩니다"
+          fi
+          
+          # Checkov가 디렉터리 구조로 생성한 경우 파일 이동
+          if [ -d "checkov-results.sarif" ] && [ -f "checkov-results.sarif/results_sarif.sarif" ]; then
+            echo "🔄 Checkov SARIF 결과 파일 이동 중..."
+            mv "checkov-results.sarif/results_sarif.sarif" "checkov-results.sarif.tmp"
+            rm -rf "checkov-results.sarif"
+            mv "checkov-results.sarif.tmp" "checkov-results.sarif"
+            echo "✅ SARIF 파일 이동 완료"
           fi
           
           # JSON 결과 파일 존재 확인 및 기본 파일 생성 (Requirement 7.1)
