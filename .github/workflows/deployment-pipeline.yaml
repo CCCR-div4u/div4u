@@ -12,8 +12,11 @@ on:
       - 'comparison/**'
 
 env:
-  REGISTRY: harbor.bluesunnywings.com/div4u
+  REGISTRY_BASE: harbor.bluesunnywings.com
+  REGISTRY: ${{ github.ref_name == 'main' && 'harbor.bluesunnywings.com/div4u-production' || github.ref_name == 'develop' && 'harbor.bluesunnywings.com/div4u-staging' || 'harbor.bluesunnywings.com/div4u' }}
   IMAGE_TAG: ${{ github.sha }}
+  BUILD_NUMBER: ${{ github.run_number }}
+  TIMESTAMP: ${{ github.run_id }}
 
 jobs:
   build:
@@ -510,14 +513,41 @@ jobs:
 
       - name: Update deployment manifests
         run: |
-          sed -i "s|image: ${{ env.REGISTRY }}/div4u-frontend:.*|image: ${{ env.REGISTRY }}/div4u-frontend:${{ env.IMAGE_TAG }}|" k8s/frontend/frontend-deployment.yaml
-          sed -i "s|image: ${{ env.REGISTRY }}/div4u-backend:.*|image: ${{ env.REGISTRY }}/div4u-backend:${{ env.IMAGE_TAG }}|" k8s/backend/backend-deployment.yaml
-          sed -i "s|image: ${{ env.REGISTRY }}/div4u-comparison:.*|image: ${{ env.REGISTRY }}/div4u-comparison:${{ env.IMAGE_TAG }}|" k8s/comparison/comparison-deployment.yaml
+          # Determine environment based on branch
+          if [[ "${{ github.ref_name }}" == "develop" ]]; then
+            ENV_PATH="k8s/environments/staging"
+            echo "Updating staging environment with tag: ${{ env.IMAGE_TAG }}"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            ENV_PATH="k8s/environments/production"
+            echo "Updating production environment with tag: ${{ env.IMAGE_TAG }}"
+          else
+            echo "Branch ${{ github.ref_name }} not configured for deployment"
+            exit 0
+          fi
+          
+          # Update kustomization.yaml with new image tags
+          cd $ENV_PATH
+          
+          # Update all service image tags
+          sed -i "s|newTag: .*|newTag: ${{ env.IMAGE_TAG }}|g" kustomization.yaml
+          
+          # Verify the changes
+          echo "Updated kustomization.yaml:"
+          cat kustomization.yaml
 
       - name: Commit and push changes
         run: |
           git config --global user.name "rustzh"
           git config --global user.email "soonso00@naver.com"
-          git add k8s/*/
-          git commit -m "Update image tags to ${{ env.IMAGE_TAG }}" || exit 0
+          
+          # Add only the specific environment directory
+          if [[ "${{ github.ref_name }}" == "develop" ]]; then
+            git add k8s/environments/staging/
+            COMMIT_MSG="ci(staging): update image tags to ${{ env.IMAGE_TAG }}"
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            git add k8s/environments/production/
+            COMMIT_MSG="ci(production): update image tags to ${{ env.IMAGE_TAG }}"
+          fi
+          
+          git commit -m "$COMMIT_MSG" || exit 0
           git push origin ${{ github.ref_name }}
