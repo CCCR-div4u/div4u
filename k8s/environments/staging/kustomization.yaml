@@ -8,7 +8,6 @@ resources:
 - ../../base/frontend
 - ../../base/comparison
 - ../../base/common
-- sealed-secrets.yaml
 
 patches:
 - path: patches/configmap-staging.yaml
@@ -40,3 +39,4 @@ labels:
     environment: staging
 
 namePrefix: staging-
+
