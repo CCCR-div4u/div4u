@@ -8,6 +8,7 @@ resources:
 - ../../base/frontend
 - ../../base/comparison
 - ../../base/common
+- sealed-secrets.yaml
 
 patches:
 - path: patches/configmap-staging.yaml
@@ -18,7 +19,10 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
-- path: patches/imagepullsecrets-staging.yaml
+- path: patches/frontend-service-urls.yaml
+  target:
+    kind: Deployment
+    name: div4u-frontend
 
 images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend

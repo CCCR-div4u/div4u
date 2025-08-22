@@ -8,6 +8,9 @@ resources:
 - ../../base/frontend
 - ../../base/comparison
 - ../../base/common
+- sealed-secrets.yaml
+- harbor-registry-secret.yaml
+- seoul-api-secret.yaml
 
 patches:
 - path: patches/configmap-production.yaml
@@ -18,7 +21,10 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
-- path: patches/imagepullsecrets-production.yaml
+- path: patches/frontend-service-urls.yaml
+  target:
+    kind: Deployment
+    name: div4u-frontend
 
 replicas:
 - name: div4u-backend
