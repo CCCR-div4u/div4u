@@ -8,9 +8,6 @@ resources:
 - ../../base/frontend
 - ../../base/comparison
 - ../../base/common
-- sealed-secrets.yaml
-- harbor-registry-secret.yaml
-- seoul-api-secret.yaml
 
 patches:
 - path: patches/configmap-production.yaml
@@ -50,3 +47,4 @@ labels:
     environment: production
 
 namePrefix: prod-
+
