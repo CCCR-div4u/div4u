@@ -18,6 +18,7 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
+    
 - path: patches/frontend-service-urls.yaml
   target:
     kind: Deployment
@@ -26,17 +27,16 @@ patches:
 images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-backend
-  newTag: e276e9c61ebb5cf014e212d22a91d6fd686d6221
+  newTag: ee5fef2b850c6ae33aa52bd6470dc6e60c750c1b
 - name: harbor.bluesunnywings.com/div4u/div4u-frontend
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-frontend
-  newTag: e276e9c61ebb5cf014e212d22a91d6fd686d6221
+  newTag: ee5fef2b850c6ae33aa52bd6470dc6e60c750c1b
 - name: harbor.bluesunnywings.com/div4u/div4u-comparison
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-comparison
-  newTag: e276e9c61ebb5cf014e212d22a91d6fd686d6221
+  newTag: ee5fef2b850c6ae33aa52bd6470dc6e60c750c1b
 
 labels:
 - pairs:
     environment: staging
-
+    
 namePrefix: staging-
-

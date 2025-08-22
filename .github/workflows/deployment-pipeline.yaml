@@ -468,11 +468,30 @@ jobs:
             
             **⏰ Manual approval required to proceed with deployment.**
 
-  push-images:
-    name: Push Images
+  configure-harbor:
+    name: Configure Harbor
     runs-on: ubuntu-latest
     needs: [security-scan, slack-approval]
     if: always() && (needs.slack-approval.result == 'success' || (github.event.inputs.skip_approval && needs.security-scan.result == 'success'))
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Harbor auto-scan and SBOM
+        env:
+          HARBOR_URL: https://${{ env.REGISTRY_BASE }}
+          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+          PROJECT_NAME: ${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}
+        run: |
+          chmod +x ./scripts/configure-harbor.sh
+          ./scripts/configure-harbor.sh
+
+  push-images:
+    name: Push Images
+    runs-on: ubuntu-latest
+    needs: [configure-harbor]
     permissions:
       contents: read
       packages: write
@@ -514,6 +533,11 @@ jobs:
         run: |
           cosign sign --yes ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
           cosign sign --yes ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
+
+      - name: Verify Harbor auto-scan
+        run: |
+          echo "Harbor auto-scan and SBOM generation will trigger automatically"
+          echo "Check results at: https://${{ env.REGISTRY_BASE }}/harbor/projects/${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}/repositories"
 
   update-manifests:
     name: Update K8s Manifests
