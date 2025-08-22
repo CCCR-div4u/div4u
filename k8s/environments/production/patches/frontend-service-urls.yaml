@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: div4u-frontend
+spec:
+  template:
+    spec:
+      containers:
+      - name: frontend
+        env:
+        - name: BACKEND_SERVICE_URL
+          value: "http://prod-div4u-backend-service:3001"
+        - name: COMPARISON_SERVICE_URL
+          value: "http://prod-div4u-comparison-service:3002"
