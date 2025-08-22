@@ -18,6 +18,11 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
+    
+- path: patches/frontend-service-urls.yaml
+  target:
+    kind: Deployment
+    name: div4u-frontend
 
 images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend
@@ -33,5 +38,5 @@ images:
 labels:
 - pairs:
     environment: staging
-
+    
 namePrefix: staging-

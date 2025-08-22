@@ -18,6 +18,11 @@ patches:
   target:
     kind: Ingress
     name: div4u-ingress
+    
+- path: patches/frontend-service-urls.yaml
+  target:
+    kind: Deployment
+    name: div4u-frontend
 
 replicas:
 - name: div4u-backend
