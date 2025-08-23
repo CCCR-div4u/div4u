@@ -29,8 +29,10 @@ ENV VITE_APP_VERSION=$VITE_APP_VERSION
 # React 앱 빌드
 RUN npm run build
 
-# BFF 서버 파일 준비
-RUN npm run copy:server
+# BFF 서버 파일을 dist 디렉토리로 복사
+RUN cp server.js dist/ && \
+    cp package.json dist/ && \
+    echo '{"type":"module","dependencies":{"express":"^4.18.2","http-proxy-middleware":"^2.0.6"}}' > dist/package.json
 
 # Stage 2: BFF Runtime
 FROM node:18-alpine
