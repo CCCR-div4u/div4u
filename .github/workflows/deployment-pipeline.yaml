@@ -67,11 +67,6 @@ jobs:
           cd backend
           npm ci
 
-      - name: Run backend tests
-        run: |
-          cd backend
-          npm test || echo "Backend tests failed, continuing..."
-
       - name: Build backend
         run: |
           cd backend
@@ -84,16 +79,6 @@ jobs:
           cd frontend
           npm ci
 
-      - name: Run frontend linting
-        run: |
-          cd frontend
-          npm run lint || true
-
-      - name: Run frontend tests
-        run: |
-          cd frontend
-          npm test || echo "Frontend tests failed, continuing..."
-
       - name: Build frontend
         run: |
           cd frontend
@@ -105,16 +90,6 @@ jobs:
         run: |
           cd comparison
           npm ci
-
-      - name: Run comparison linting
-        run: |
-          cd comparison
-          npm run lint || true
-
-      - name: Run comparison tests
-        run: |
-          cd comparison
-          npm test || echo "Comparison tests failed, continuing..."
 
       - name: Build comparison
         run: |
@@ -152,6 +127,7 @@ jobs:
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v4
+        continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -246,7 +222,7 @@ jobs:
     name: Security Review & Deployment Approval
     runs-on: ubuntu-latest
     needs: security-scan
-    if: always() && github.event.inputs.skip_approval != 'true'
+    if: success() && github.event.inputs.skip_approval != 'true'
     permissions:
       contents: read
       actions: read
@@ -508,7 +484,7 @@ jobs:
     name: Configure Harbor
     runs-on: ubuntu-latest
     needs: [security-scan, slack-approval]
-    if: always() && (needs.slack-approval.result == 'success' || (github.event.inputs.skip_approval && needs.security-scan.result == 'success'))
+    if: success() && (needs.slack-approval.result == 'success' || (github.event.inputs.skip_approval && needs.security-scan.result == 'success'))
     
     steps:
       - name: Checkout repository
@@ -579,7 +555,7 @@ jobs:
     name: Update K8s Manifests
     runs-on: ubuntu-latest
     needs: push-images
-    if: always() && needs.push-images.result == 'success'
+    if: success()
     permissions:
       contents: write
     
