@@ -577,7 +577,6 @@ jobs:
             report.html
             report.json
             report.md
-            report.xml
           retention-days: 30
 
       - name: Parse DAST results
@@ -585,9 +584,9 @@ jobs:
         if: always()
         run: |
           if [ -f "report.json" ]; then
-            HIGH_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' report_json.json 2>/dev/null || echo 0)
-            MEDIUM_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' report_json.json 2>/dev/null || echo 0)
-            LOW_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' report_json.json 2>/dev/null || echo 0)
+            HIGH_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' report.json 2>/dev/null || echo 0)
+            MEDIUM_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' report.json 2>/dev/null || echo 0)
+            LOW_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' report.json 2>/dev/null || echo 0)
             
             echo "high_risk=$HIGH_RISK" >> $GITHUB_OUTPUT
             echo "medium_risk=$MEDIUM_RISK" >> $GITHUB_OUTPUT
