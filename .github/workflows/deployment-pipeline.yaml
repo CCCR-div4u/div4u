@@ -572,19 +572,19 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zap_scan
+          name: zap-scan-report
           path: |
-            report_html.html
-            report_json.json
-            report_md.md
-            report_xml.xml
+            report.html
+            report.json
+            report.md
+            report.xml
           retention-days: 30
 
       - name: Parse DAST results
         id: parse-dast
         if: always()
         run: |
-          if [ -f "report_json.json" ]; then
+          if [ -f "report.json" ]; then
             HIGH_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' report_json.json 2>/dev/null || echo 0)
             MEDIUM_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' report_json.json 2>/dev/null || echo 0)
             LOW_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' report_json.json 2>/dev/null || echo 0)
