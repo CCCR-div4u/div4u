@@ -28,13 +28,13 @@ images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-backend
 
-  newTag: 7dc474f0ff79c6fb23d5146bd1e16060441b5555
+  newTag: c3a02fa00e2042bcd54dc67e1277b9106f78eb03
 - name: harbor.bluesunnywings.com/div4u/div4u-frontend
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-frontend
-  newTag: 7dc474f0ff79c6fb23d5146bd1e16060441b5555
+  newTag: c3a02fa00e2042bcd54dc67e1277b9106f78eb03
 - name: harbor.bluesunnywings.com/div4u/div4u-comparison
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-comparison
-  newTag: 7dc474f0ff79c6fb23d5146bd1e16060441b5555
+  newTag: c3a02fa00e2042bcd54dc67e1277b9106f78eb03
 
 labels:
 - pairs:
