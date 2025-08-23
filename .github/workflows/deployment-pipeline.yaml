@@ -560,12 +560,12 @@ jobs:
       - name: Run ZAP DAST Scan
         uses: zaproxy/action-full-scan@v0.10.0
         with:
-          target: 'https://staging.div4u.bluesunnywings.com'
+          target: 'https://staging.div4u.com'
           rules_file_name: '.zap/rules.tsv'
           cmd_options: '-a -j -m 10 -T 60 -c .zap/context.xml'
           allow_issue_writing: false
           fail_action: false
-          artifact_name: 'zap-dast-scan'
+          artifact_name: 'zap_dast_scan'
 
       - name: Upload DAST results
         uses: actions/upload-artifact@v4
@@ -628,7 +628,7 @@ jobs:
                     },
                     {
                       "title": "Target URL",
-                      "value": "https://staging.div4u.bluesunnywings.com",
+                      "value": "https://staging.div4u.com",
                       "short": true
                     },
                     {
