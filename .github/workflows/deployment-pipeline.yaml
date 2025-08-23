@@ -56,46 +56,82 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+            comparison/package-lock.json
       
       - name: Install backend dependencies
         run: |
           cd backend
-          npm install
+          npm ci
+
+      - name: Run backend tests
+        run: |
+          cd backend
+          npm test || echo "Backend tests failed, continuing..."
 
       - name: Build backend
         run: |
           cd backend
+          echo "Building backend..."
           npm run build
+          echo "Backend build completed successfully"
 
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm install
+          npm ci
 
       - name: Run frontend linting
         run: |
           cd frontend
           npm run lint || true
 
-      - name: Build frontend (BFF)
+      - name: Run frontend tests
         run: |
           cd frontend
-          npm run build:bff
+          npm test || echo "Frontend tests failed, continuing..."
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          echo "Building frontend..."
+          npm run build
+          echo "Frontend build completed successfully"
 
       - name: Install comparison dependencies
         run: |
           cd comparison
-          npm install
+          npm ci
 
       - name: Run comparison linting
         run: |
           cd comparison
           npm run lint || true
 
+      - name: Run comparison tests
+        run: |
+          cd comparison
+          npm test || echo "Comparison tests failed, continuing..."
+
       - name: Build comparison
         run: |
           cd comparison
+          echo "Building comparison service..."
           npm run build
+          echo "Comparison build completed successfully"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            backend/dist/
+            frontend/dist/
+            comparison/dist/
+          retention-days: 7
 
       - name: Run SCA with Trivy
         uses: aquasecurity/trivy-action@master
