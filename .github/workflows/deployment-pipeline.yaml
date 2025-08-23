@@ -539,6 +539,129 @@ jobs:
           echo "Harbor auto-scan and SBOM generation will trigger automatically"
           echo "Check results at: https://${{ env.REGISTRY_BASE }}/harbor/projects/${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}/repositories"
 
+  dast-scan:
+    name: DAST Scan (Staging Only)
+    runs-on: ubuntu-latest
+    needs: update-manifests
+    if: env.TARGET_ENV == 'staging' && needs.update-manifests.result == 'success'
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for staging deployment
+        run: |
+          echo "Waiting for staging deployment to be ready..."
+          sleep 180  # Wait for ArgoCD to deploy and pods to be ready
+
+      - name: Run ZAP DAST Scan
+        uses: zaproxy/action-full-scan@v0.10.0
+        with:
+          target: 'https://staging.div4u.bluesunnywings.com'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a -j -m 10 -T 60 -c .zap/context.xml'
+          allow_issue_writing: false
+          fail_action: false
+
+      - name: Upload DAST results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-dast-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+            report_xml.xml
+          retention-days: 30
+
+      - name: Parse DAST results
+        id: parse-dast
+        if: always()
+        run: |
+          if [ -f "report_json.json" ]; then
+            HIGH_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("High"))] | length' report_json.json 2>/dev/null || echo 0)
+            MEDIUM_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Medium"))] | length' report_json.json 2>/dev/null || echo 0)
+            LOW_RISK=$(jq '[.site[].alerts[] | select(.riskdesc | startswith("Low"))] | length' report_json.json 2>/dev/null || echo 0)
+            
+            echo "high_risk=$HIGH_RISK" >> $GITHUB_OUTPUT
+            echo "medium_risk=$MEDIUM_RISK" >> $GITHUB_OUTPUT
+            echo "low_risk=$LOW_RISK" >> $GITHUB_OUTPUT
+            
+            echo "DAST Scan Results:"
+            echo "High Risk: $HIGH_RISK"
+            echo "Medium Risk: $MEDIUM_RISK"
+            echo "Low Risk: $LOW_RISK"
+          else
+            echo "No DAST results found"
+            echo "high_risk=0" >> $GITHUB_OUTPUT
+            echo "medium_risk=0" >> $GITHUB_OUTPUT
+            echo "low_risk=0" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send DAST results to Slack
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#div4u-ci-alerts'
+          custom_payload: |
+            {
+              "text": "🔍 DAST Scan Complete - Staging Environment",
+              "attachments": [
+                {
+                  "color": "${{ steps.parse-dast.outputs.high_risk > 0 && 'danger' || steps.parse-dast.outputs.medium_risk > 0 && 'warning' || 'good' }}",
+                  "fields": [
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Environment",
+                      "value": "Staging",
+                      "short": true
+                    },
+                    {
+                      "title": "Target URL",
+                      "value": "https://staging.div4u.bluesunnywings.com",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>",
+                      "short": true
+                    },
+                    {
+                      "title": "🚨 High Risk",
+                      "value": "${{ steps.parse-dast.outputs.high_risk }}",
+                      "short": true
+                    },
+                    {
+                      "title": "⚠️ Medium Risk",
+                      "value": "${{ steps.parse-dast.outputs.medium_risk }}",
+                      "short": true
+                    },
+                    {
+                      "title": "📋 Low Risk",
+                      "value": "${{ steps.parse-dast.outputs.low_risk }}",
+                      "short": true
+                    },
+                    {
+                      "title": "📊 DAST Report",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Detailed Results>",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   update-manifests:
     name: Update K8s Manifests
     runs-on: ubuntu-latest

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<configuration>
+    <context>
+        <name>div4u-staging</name>
+        <desc>DAST scan context for div4u staging environment</desc>
+        <inscope>true</inscope>
+        <incregexes>https://staging\.div4u\.bluesunnywings\.com.*</incregexes>
+        <excregexes>
+            <regex>.*logout.*</regex>
+            <regex>.*admin.*</regex>
+            <regex>.*\.css</regex>
+            <regex>.*\.js</regex>
+            <regex>.*\.png</regex>
+            <regex>.*\.jpg</regex>
+            <regex>.*\.jpeg</regex>
+            <regex>.*\.gif</regex>
+            <regex>.*\.svg</regex>
+            <regex>.*\.ico</regex>
+            <regex>.*\.woff</regex>
+            <regex>.*\.woff2</regex>
+            <regex>.*\.ttf</regex>
+            <regex>.*\.eot</regex>
+        </excregexes>
+        <tech>
+            <include>Db</include>
+            <include>Db.MySQL</include>
+            <include>Language</include>
+            <include>Language.JavaScript</include>
+            <include>OS</include>
+            <include>OS.Linux</include>
+            <include>SCM</include>
+            <include>SCM.Git</include>
+            <include>WS</include>
+            <include>WS.Nginx</include>
+        </tech>
+        <urlparser>
+            <class>org.zaproxy.zap.model.StandardParameterParser</class>
+            <config></config>
+        </urlparser>
+        <postparser>
+            <class>org.zaproxy.zap.model.StandardParameterParser</class>
+            <config></config>
+        </postparser>
+        <authentication>
+            <type>0</type>
+        </authentication>
+        <users/>
+        <forceduser>-1</forceduser>
+        <session>
+            <type>0</type>
+        </session>
+    </context>
+</configuration>

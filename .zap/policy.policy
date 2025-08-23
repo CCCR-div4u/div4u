@@ -1,0 +1,82 @@
+# ZAP Scanning Policy for div4u staging environment
+# This policy focuses on critical security vulnerabilities
+
+# SQL Injection
+scanner.40018.level=HIGH
+scanner.40018.strength=HIGH
+
+# Cross Site Scripting (Reflected)
+scanner.40012.level=HIGH
+scanner.40012.strength=HIGH
+
+# Cross Site Scripting (Stored)
+scanner.40014.level=HIGH
+scanner.40014.strength=HIGH
+
+# Cross Site Scripting (DOM Based)
+scanner.40016.level=HIGH
+scanner.40016.strength=HIGH
+
+# Path Traversal
+scanner.6.level=HIGH
+scanner.6.strength=HIGH
+
+# Remote File Inclusion
+scanner.7.level=HIGH
+scanner.7.strength=HIGH
+
+# Server Side Include
+scanner.40009.level=HIGH
+scanner.40009.strength=HIGH
+
+# Cross Site Request Forgery
+scanner.20016.level=HIGH
+scanner.20016.strength=HIGH
+
+# External Redirect
+scanner.20019.level=MEDIUM
+scanner.20019.strength=MEDIUM
+
+# Source Code Disclosure - CVE-2012-1823
+scanner.20017.level=HIGH
+scanner.20017.strength=HIGH
+
+# Remote Code Execution - CVE-2012-1823
+scanner.20018.level=HIGH
+scanner.20018.strength=HIGH
+
+# Format String Error
+scanner.30002.level=HIGH
+scanner.30002.strength=HIGH
+
+# Buffer Overflow
+scanner.30001.level=HIGH
+scanner.30001.strength=HIGH
+
+# Command Injection
+scanner.90020.level=HIGH
+scanner.90020.strength=HIGH
+
+# LDAP Injection
+scanner.40015.level=HIGH
+scanner.40015.strength=HIGH
+
+# XPath Injection
+scanner.90021.level=HIGH
+scanner.90021.strength=HIGH
+
+# XML External Entity Attack
+scanner.90023.level=HIGH
+scanner.90023.strength=HIGH
+
+# Generic Padding Oracle
+scanner.90024.level=HIGH
+scanner.90024.strength=HIGH
+
+# Expression Language Injection
+scanner.90025.level=HIGH
+scanner.90025.strength=HIGH
+
+# NoSQL Injection - MongoDB
+scanner.40033.level=HIGH
+scanner.40033.strength=HIGH
