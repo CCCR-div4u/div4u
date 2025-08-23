@@ -562,10 +562,10 @@ jobs:
         with:
           target: 'https://staging.div4u.com'
           rules_file_name: '.zap/rules.tsv'
-          cmd_options: '-a -j -m 10 -T 60 -c .zap/context.xml'
+          cmd_options: '-a -j -m 3 -T 15 -d 2'
           allow_issue_writing: false
           fail_action: false
-          artifact_name: 'zap_dast_scan'
+          artifact_name: 'zap-dast-scan'
 
       - name: Upload DAST results
         uses: actions/upload-artifact@v4
