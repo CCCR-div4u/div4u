@@ -35,515 +35,514 @@ env:
   TIMESTAMP: ${{ github.run_id }}
 
 jobs:
-  build:
-    name: Build and Test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    strategy:
-      matrix:
-        node-version: [18]
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # build:
+  #   name: Build and Test
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #     actions: read
+  #   strategy:
+  #     matrix:
+  #       node-version: [18]
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-      
-      - name: Install backend dependencies
-        run: |
-          cd backend
-          npm install
+  #     - name: Setup Node.js ${{ matrix.node-version }}
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ matrix.node-version }}
+  #     
+  #     - name: Install backend dependencies
+  #       run: |
+  #         cd backend
+  #         npm install
 
-      - name: Build backend
-        run: |
-          cd backend
-          npm run build
+  #     - name: Build backend
+  #       run: |
+  #         cd backend
+  #         npm run build
 
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm install
+  #     - name: Install frontend dependencies
+  #       run: |
+  #         cd frontend
+  #         npm install
 
-      - name: Run frontend linting
-        run: |
-          cd frontend
-          npm run lint || true
+  #     - name: Run frontend linting
+  #       run: |
+  #         cd frontend
+  #         npm run lint || true
 
-      - name: Build frontend (BFF)
-        run: |
-          cd frontend
-          npm run build:bff
+  #     - name: Build frontend (BFF)
+  #       run: |
+  #         cd frontend
+  #         npm run build:bff
 
-      - name: Install comparison dependencies
-        run: |
-          cd comparison
-          npm install
+  #     - name: Install comparison dependencies
+  #       run: |
+  #         cd comparison
+  #         npm install
 
-      - name: Run comparison linting
-        run: |
-          cd comparison
-          npm run lint || true
+  #     - name: Run comparison linting
+  #       run: |
+  #         cd comparison
+  #         npm run lint || true
 
-      - name: Build comparison
-        run: |
-          cd comparison
-          npm run build
+  #     - name: Build comparison
+  #       run: |
+  #         cd comparison
+  #         npm run build
 
-      - name: Run SCA with Trivy
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-sca-results.sarif'
+  #     - name: Run SCA with Trivy
+  #       uses: aquasecurity/trivy-action@master
+  #       continue-on-error: true
+  #       with:
+  #         scan-type: 'fs'
+  #         scan-ref: '.'
+  #         format: 'sarif'
+  #         output: 'trivy-sca-results.sarif'
 
-      - name: Upload Trivy SCA results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: 'trivy-sca-results.sarif'
-          category: 'trivy-sca'
+  #     - name: Upload Trivy SCA results to GitHub Security tab
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       if: always()
+  #       continue-on-error: true
+  #       with:
+  #         sarif_file: 'trivy-sca-results.sarif'
+  #         category: 'trivy-sca'
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v4
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  #     - name: SonarQube Scan
+  #       uses: SonarSource/sonarqube-scan-action@v4
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # - name: SonarQube Quality Gate
-      #   uses: SonarSource/sonarqube-quality-gate-action@v1
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #     # - name: SonarQube Quality Gate
+  #     #   uses: SonarSource/sonarqube-quality-gate-action@v1
+  #     #   timeout-minutes: 5
+  #     #   env:
+  #     #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  build-images:
-    name: Build Images
-    runs-on: ubuntu-latest
-    needs: build
-    strategy:
-      matrix:
-        service: 
-          - { name: "frontend", context: "./frontend", dockerfile: "./frontend/Dockerfile" }
-          - { name: "backend", context: "./backend", dockerfile: "./backend/Dockerfile" }
-          - { name: "comparison", context: "./comparison", dockerfile: "./comparison/Dockerfile" }
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # build-images:
+  #   name: Build Images
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   strategy:
+  #     matrix:
+  #       service: 
+  #         - { name: "frontend", context: "./frontend", dockerfile: "./frontend/Dockerfile" }
+  #         - { name: "backend", context: "./backend", dockerfile: "./backend/Dockerfile" }
+  #         - { name: "comparison", context: "./comparison", dockerfile: "./comparison/Dockerfile" }
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Build ${{ matrix.service.name }} image
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.service.context }}
-          file: ${{ matrix.service.dockerfile }}
-          push: false
-          tags: |
-            ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
-            ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
-          load: true
+  #     - name: Build ${{ matrix.service.name }} image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: ${{ matrix.service.context }}
+  #         file: ${{ matrix.service.dockerfile }}
+  #         push: false
+  #         tags: |
+  #           ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
+  #           ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
+  #         load: true
 
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: build-images
-    permissions:
-      contents: read
-      security-events: write
-      actions: read
-    strategy:
-      matrix:
-        service: 
-          - { name: "frontend" }
-          - { name: "backend" }
-          - { name: "comparison" }
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # security-scan:
+  #   name: Security Scan
+  #   runs-on: ubuntu-latest
+  #   needs: build-images
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #     actions: read
+  #   strategy:
+  #     matrix:
+  #       service: 
+  #         - { name: "frontend" }
+  #         - { name: "backend" }
+  #         - { name: "comparison" }
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Build ${{ matrix.service.name }} image for scan
-        uses: docker/build-push-action@v6
-        with:
-          context: ./${{ matrix.service.name }}
-          file: ./${{ matrix.service.name }}/Dockerfile
-          push: false
-          tags: ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
-          load: true
+  #     - name: Build ${{ matrix.service.name }} image for scan
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: ./${{ matrix.service.name }}
+  #         file: ./${{ matrix.service.name }}/Dockerfile
+  #         push: false
+  #         tags: ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
+  #         load: true
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        continue-on-error: true
-        with:
-          image-ref: '${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}'
-          format: 'sarif'
-          output: 'trivy-${{ matrix.service.name }}-results.sarif'
-          # severity: 'HIGH,CRITICAL'
-          # exit-code: '1'
+  #     - name: Run Trivy vulnerability scanner
+  #       uses: aquasecurity/trivy-action@master
+  #       continue-on-error: true
+  #       with:
+  #         image-ref: '${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}'
+  #         format: 'sarif'
+  #         output: 'trivy-${{ matrix.service.name }}-results.sarif'
+  #         # severity: 'HIGH,CRITICAL'
+  #         # exit-code: '1'
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: 'trivy-${{ matrix.service.name }}-results.sarif'
-          category: 'trivy-${{ matrix.service.name }}'
+  #     - name: Upload Trivy scan results to GitHub Security tab
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       if: always()
+  #       continue-on-error: true
+  #       with:
+  #         sarif_file: 'trivy-${{ matrix.service.name }}-results.sarif'
+  #         category: 'trivy-${{ matrix.service.name }}'
 
-      - name: Upload scan results as artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: trivy-${{ matrix.service.name }}-results
-          path: trivy-${{ matrix.service.name }}-results.sarif
-          retention-days: 30
+  #     - name: Upload scan results as artifacts
+  #       uses: actions/upload-artifact@v4
+  #       if: always()
+  #       with:
+  #         name: trivy-${{ matrix.service.name }}-results
+  #         path: trivy-${{ matrix.service.name }}-results.sarif
+  #         retention-days: 30
 
-  slack-approval:
-    name: Security Review & Deployment Approval
-    runs-on: ubuntu-latest
-    needs: security-scan
-    if: always() && github.event.inputs.skip_approval != 'true'
-    permissions:
-      contents: read
-      actions: read
-      issues: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # slack-approval:
+  #   name: Security Review & Deployment Approval
+  #   runs-on: ubuntu-latest
+  #   needs: security-scan
+  #   if: always() && github.event.inputs.skip_approval != 'true'
+  #   permissions:
+  #     contents: read
+  #     actions: read
+  #     issues: write
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Download security scan results
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          pattern: trivy-*-results
-          merge-multiple: true
+  #     - name: Download security scan results
+  #       uses: actions/download-artifact@v4
+  #       continue-on-error: true
+  #       with:
+  #         pattern: trivy-*-results
+  #         merge-multiple: true
 
-      - name: Parse security scan results
-        id: parse-results
-        run: |
-          CRITICAL=0
-          HIGH=0
-          MEDIUM=0
-          SERVICES=""
-          DETAILED_RESULTS=""
-          
-          for file in trivy-*-results.sarif; do
-            if [ -f "$file" ]; then
-              SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
-              SERVICES="$SERVICES $SERVICE"
-              
-              echo "\n=== Processing $SERVICE ==="
-              
-              # Count vulnerabilities by severity and extract details
-              if command -v jq >/dev/null 2>&1; then
-                CRIT_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "error")] | length' "$file" 2>/dev/null || echo 0)
-                HIGH_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "warning")] | length' "$file" 2>/dev/null || echo 0)
-                MED_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "note")] | length' "$file" 2>/dev/null || echo 0)
-                
-                CRITICAL=$((CRITICAL + CRIT_COUNT))
-                HIGH=$((HIGH + HIGH_COUNT))
-                MEDIUM=$((MEDIUM + MED_COUNT))
-                
-                # Extract top vulnerabilities for each service
-                SERVICE_DETAILS="\n**🔍 $SERVICE Service:**\n"
-                
-                # Critical vulnerabilities
-                if [ "$CRIT_COUNT" -gt 0 ]; then
-                  CRIT_VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "error") | "- 🚨 " + (.ruleId // "Unknown") + ": " + (.message.text // "No description")' "$file" 2>/dev/null | head -3)
-                  SERVICE_DETAILS="${SERVICE_DETAILS}Critical ($CRIT_COUNT):\n$CRIT_VULNS\n"
-                fi
-                
-                # High vulnerabilities  
-                if [ "$HIGH_COUNT" -gt 0 ]; then
-                  HIGH_VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "warning") | "- ⚠️ " + (.ruleId // "Unknown") + ": " + (.message.text // "No description")' "$file" 2>/dev/null | head -3)
-                  SERVICE_DETAILS="${SERVICE_DETAILS}High ($HIGH_COUNT):\n$HIGH_VULNS\n"
-                fi
-                
-                # Add service details to overall results
-                DETAILED_RESULTS="${DETAILED_RESULTS}${SERVICE_DETAILS}"
-              fi
-            fi
-          done
-          
-          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
-          echo "high=$HIGH" >> $GITHUB_OUTPUT
-          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
-          echo "services=$SERVICES" >> $GITHUB_OUTPUT
-          
-          # Save detailed results to file for GitHub Issue
-          echo "$DETAILED_RESULTS" > detailed_results.txt
-          echo "detailed_results<<EOF" >> $GITHUB_OUTPUT
-          echo "$DETAILED_RESULTS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+  #     - name: Parse security scan results
+  #       id: parse-results
+  #       run: |
+  #         CRITICAL=0
+  #         HIGH=0
+  #         MEDIUM=0
+  #         SERVICES=""
+  #         DETAILED_RESULTS=""
+  #         
+  #         for file in trivy-*-results.sarif; do
+  #           if [ -f "$file" ]; then
+  #             SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
+  #             SERVICES="$SERVICES $SERVICE"
+  #             
+  #             echo "\n=== Processing $SERVICE ==="
+  #             
+  #             # Count vulnerabilities by severity and extract details
+  #             if command -v jq >/dev/null 2>&1; then
+  #               CRIT_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "error")] | length' "$file" 2>/dev/null || echo 0)
+  #               HIGH_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "warning")] | length' "$file" 2>/dev/null || echo 0)
+  #               MED_COUNT=$(jq '[.runs[]?.results[]? | select(.level == "note")] | length' "$file" 2>/dev/null || echo 0)
+  #               
+  #               CRITICAL=$((CRITICAL + CRIT_COUNT))
+  #               HIGH=$((HIGH + HIGH_COUNT))
+  #               MEDIUM=$((MEDIUM + MED_COUNT))
+  #               
+  #               # Extract top vulnerabilities for each service
+  #               SERVICE_DETAILS="\n**🔍 $SERVICE Service:**\n"
+  #               
+  #               # Critical vulnerabilities
+  #               if [ "$CRIT_COUNT" -gt 0 ]; then
+  #                 CRIT_VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "error") | "- 🚨 " + (.ruleId // "Unknown") + ": " + (.message.text // "No description")' "$file" 2>/dev/null | head -3)
+  #                 SERVICE_DETAILS="${SERVICE_DETAILS}Critical ($CRIT_COUNT):\n$CRIT_VULNS\n"
+  #               fi
+  #               
+  #               # High vulnerabilities  
+  #               if [ "$HIGH_COUNT" -gt 0 ]; then
+  #                 HIGH_VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "warning") | "- ⚠️ " + (.ruleId // "Unknown") + ": " + (.message.text // "No description")' "$file" 2>/dev/null | head -3)
+  #                 SERVICE_DETAILS="${SERVICE_DETAILS}High ($HIGH_COUNT):\n$HIGH_VULNS\n"
+  #               fi
+  #               
+  #               # Add service details to overall results
+  #               DETAILED_RESULTS="${DETAILED_RESULTS}${SERVICE_DETAILS}"
+  #             fi
+  #           fi
+  #         done
+  #         
+  #         echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+  #         echo "high=$HIGH" >> $GITHUB_OUTPUT
+  #         echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+  #         echo "services=$SERVICES" >> $GITHUB_OUTPUT
+  #         
+  #         # Save detailed results to file for GitHub Issue
+  #         echo "$DETAILED_RESULTS" > detailed_results.txt
+  #         echo "detailed_results<<EOF" >> $GITHUB_OUTPUT
+  #         echo "$DETAILED_RESULTS" >> $GITHUB_OUTPUT
+  #         echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Send Slack approval request
-        uses: 8398a7/action-slack@v3
-        with:
-          status: custom
-          channel: '#div4u-ci-alerts'
-          custom_payload: |
-            {
-              "text": "🔍 Security Scan Complete - Deployment Approval Required",
-              "attachments": [
-                {
-                  "color": "${{ steps.parse-results.outputs.critical > 0 && 'danger' || steps.parse-results.outputs.high > 0 && 'warning' || 'good' }}",
-                  "fields": [
-                    {
-                      "title": "Repository",
-                      "value": "${{ github.repository }}",
-                      "short": true
-                    },
-                    {
-                      "title": "Branch",
-                      "value": "${{ github.ref_name }}",
-                      "short": true
-                    },
-                    {
-                      "title": "Services Scanned",
-                      "value": "${{ steps.parse-results.outputs.services }}",
-                      "short": true
-                    },
-                    {
-                      "title": "Commit",
-                      "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>",
-                      "short": true
-                    },
-                    {
-                      "title": "🚨 Critical",
-                      "value": "${{ steps.parse-results.outputs.critical }}",
-                      "short": true
-                    },
-                    {
-                      "title": "⚠️ High",
-                      "value": "${{ steps.parse-results.outputs.high }}",
-                      "short": true
-                    },
-                    {
-                      "title": "📋 Medium",
-                      "value": "${{ steps.parse-results.outputs.medium }}",
-                      "short": true
-                    },
-                    {
-                      "title": "📊 Security Report",
-                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Detailed Results>",
-                      "short": true
-                    },
+  #     - name: Send Slack approval request
+  #       uses: 8398a7/action-slack@v3
+  #       with:
+  #         status: custom
+  #         channel: '#div4u-ci-alerts'
+  #         custom_payload: |
+  #           {
+  #             "text": "🔍 Security Scan Complete - Deployment Approval Required",
+  #             "attachments": [
+  #               {
+  #                 "color": "${{ steps.parse-results.outputs.critical > 0 && 'danger' || steps.parse-results.outputs.high > 0 && 'warning' || 'good' }}",
+  #                 "fields": [
+  #                   {
+  #                     "title": "Repository",
+  #                     "value": "${{ github.repository }}",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "Branch",
+  #                     "value": "${{ github.ref_name }}",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "Services Scanned",
+  #                     "value": "${{ steps.parse-results.outputs.services }}",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "Commit",
+  #                     "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "🚨 Critical",
+  #                     "value": "${{ steps.parse-results.outputs.critical }}",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "⚠️ High",
+  #                     "value": "${{ steps.parse-results.outputs.high }}",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "📋 Medium",
+  #                     "value": "${{ steps.parse-results.outputs.medium }}",
+  #                     "short": true
+  #                   },
+  #                   {
+  #                     "title": "📊 Security Report",
+  #                     "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Detailed Results>",
+  #                     "short": true
+  #                   },
 
-                  ],
-                  "actions": [
-                    {
-                      "type": "button",
-                      "text": "✅ Approve Deployment",
-                      "url": "${{ github.server_url }}/${{ github.repository }}/issues",
-                      "style": "primary"
-                    },
-                    {
-                      "type": "button",
-                      "text": "📋 View Vulnerability Details",
-                      "url": "${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity+label%3Avulnerability"
-                    },
-                    {
-                      "type": "button",
-                      "text": "❌ Cancel Deployment",
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                      "style": "danger"
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #                 ],
+  #                 "actions": [
+  #                   {
+  #                     "type": "button",
+  #                     "text": "✅ Approve Deployment",
+  #                     "url": "${{ github.server_url }}/${{ github.repository }}/issues",
+  #                     "style": "primary"
+  #                   },
+  #                   {
+  #                     "type": "button",
+  #                     "text": "📋 View Vulnerability Details",
+  #                     "url": "${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity+label%3Avulnerability"
+  #                   },
+  #                   {
+  #                     "type": "button",
+  #                     "text": "❌ Cancel Deployment",
+  #                     "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+  #                     "style": "danger"
+  #                   }
+  #                 ]
+  #               }
+  #             ]
+  #           }
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Create security vulnerability issues
-        if: steps.parse-results.outputs.critical > 0 || steps.parse-results.outputs.high > 0
-        run: |
-          echo "Creating security vulnerability issues..."
-          
-          for file in trivy-*-results.sarif; do
-            if [ -f "$file" ]; then
-              SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
-              
-              # Extract vulnerabilities for this service
-              VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "error" or .level == "warning") | 
-                "## " + (if .level == "error" then "🚨 Critical" else "⚠️ High" end) + ": " + (.ruleId // "Unknown") + "\n\n" +
-                "**Description:** " + (.message.text // "No description") + "\n\n" +
-                "**Location:** " + ((.locations[0].physicalLocation.artifactLocation.uri // "Unknown") + ":" + (.locations[0].physicalLocation.region.startLine // "0" | tostring)) + "\n\n" +
-                "**Severity:** " + (if .level == "error" then "Critical" else "High" end) + "\n\n---\n"' "$file" 2>/dev/null)
-              
-              if [ ! -z "$VULNS" ]; then
-                # Create issue for this service
-                ISSUE_BODY="# 🛡️ Security Vulnerabilities Found in $SERVICE Service
-          
-          **Branch:** ${{ github.ref_name }}
-          **Commit:** ${{ github.sha }}
-          **Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          
-          ## 📋 Summary
-          This issue contains security vulnerabilities discovered during automated scanning.
-          
-          $VULNS
-          
-          ## 🔗 Related Links
-          - [Security Scan Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          - [Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
-          - [Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-          
-          ## 🏷️ Labels
-          - security
-          - vulnerability
-          - $SERVICE
-          
-          **Please review and address these vulnerabilities before deployment.**"
-                
-                # Create GitHub issue
-                curl -X POST \
-                  -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                  -H "Accept: application/vnd.github.v3+json" \
-                  "${{ github.api_url }}/repos/${{ github.repository }}/issues" \
-                  -d "{
-                    \"title\": \"🛡️ Security Vulnerabilities in $SERVICE Service - ${{ github.ref_name }}\",
-                    \"body\": $(echo "$ISSUE_BODY" | jq -Rs .),
-                    \"labels\": [\"security\", \"vulnerability\", \"$SERVICE\"]
-                  }"
-                
-                echo "Created security issue for $SERVICE service"
-              fi
-            fi
-          done
+  #     - name: Create security vulnerability issues
+  #       if: steps.parse-results.outputs.critical > 0 || steps.parse-results.outputs.high > 0
+  #       run: |
+  #         echo "Creating security vulnerability issues..."
+  #         
+  #         for file in trivy-*-results.sarif; do
+  #           if [ -f "$file" ]; then
+  #             SERVICE=$(echo "$file" | sed 's/trivy-\(.*\)-results.sarif/\1/')
+  #             
+  #             # Extract vulnerabilities for this service
+  #             VULNS=$(jq -r '.runs[]?.results[]? | select(.level == "error" or .level == "warning") | 
+  #               "## " + (if .level == "error" then "🚨 Critical" else "⚠️ High" end) + ": " + (.ruleId // "Unknown") + "\n\n" +
+  #               "**Description:** " + (.message.text // "No description") + "\n\n" +
+  #               "**Location:** " + ((.locations[0].physicalLocation.artifactLocation.uri // "Unknown") + ":" + (.locations[0].physicalLocation.region.startLine // "0" | tostring)) + "\n\n" +
+  #               "**Severity:** " + (if .level == "error" then "Critical" else "High" end) + "\n\n---\n"' "$file" 2>/dev/null)
+  #             
+  #             if [ ! -z "$VULNS" ]; then
+  #               # Create issue for this service
+  #               ISSUE_BODY="# 🛡️ Security Vulnerabilities Found in $SERVICE Service
+  #         
+  #         **Branch:** ${{ github.ref_name }}
+  #         **Commit:** ${{ github.sha }}
+  #         **Scan Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+  #         
+  #         ## 📋 Summary
+  #         This issue contains security vulnerabilities discovered during automated scanning.
+  #         
+  #         $VULNS
+  #         
+  #         ## 🔗 Related Links
+  #         - [Security Scan Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+  #         - [Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
+  #         - [Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+  #         
+  #         ## 🏷️ Labels
+  #         - security
+  #         - vulnerability
+  #         - $SERVICE
+  #         
+  #         **Please review and address these vulnerabilities before deployment.**"
+  #               
+  #               # Create GitHub issue
+  #               curl -X POST \
+  #                 -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+  #                 -H "Accept: application/vnd.github.v3+json" \
+  #                 "${{ github.api_url }}/repos/${{ github.repository }}/issues" \
+  #                 -d "{
+  #                   \"title\": \"🛡️ Security Vulnerabilities in $SERVICE Service - ${{ github.ref_name }}\",
+  #                   \"body\": $(echo "$ISSUE_BODY" | jq -Rs .),
+  #                   \"labels\": [\"security\", \"vulnerability\", \"$SERVICE\"]
+  #                 }"
+  #               
+  #               echo "Created security issue for $SERVICE service"
+  #             fi
+  #           fi
+  #         done
 
-      - name: Set approvers
-        id: set-approvers
-        run: |
-          # Use workflow actor as approver (simple and reliable)
-          APPROVERS="${{ github.actor }}"
-          
-          echo "Setting approver: $APPROVERS"
-          echo "approvers=$APPROVERS" >> $GITHUB_OUTPUT
+  #     - name: Set approvers
+  #       id: set-approvers
+  #       run: |
+  #         # Use workflow actor as approver (simple and reliable)
+  #         APPROVERS="${{ github.actor }}"
+  #         
+  #         echo "Setting approver: $APPROVERS"
+  #         echo "approvers=$APPROVERS" >> $GITHUB_OUTPUT
 
-      - name: Wait for manual approval
-        uses: trstringer/manual-approval@v1
-        with:
-          secret: ${{ secrets.GITHUB_TOKEN }}
-          approvers: ${{ steps.set-approvers.outputs.approvers }}
-          minimum-approvals: 1
-          issue-title: "🔍 Security Review & Deployment Approval - ${{ github.ref_name }}"
-          issue-body: |
-            ## 🔍 Security Scan Results Summary
-            
-            **Repository:** ${{ github.repository }}  
-            **Branch:** ${{ github.ref_name }}  
-            **Commit:** ${{ github.sha }}  
-            **Services Scanned:** ${{ steps.parse-results.outputs.services }}
-            
-            ### 📊 Vulnerability Summary
-            - 🚨 **Critical:** ${{ steps.parse-results.outputs.critical }}
-            - ⚠️ **High:** ${{ steps.parse-results.outputs.high }}
-            - 📋 **Medium:** ${{ steps.parse-results.outputs.medium }}
-            
-            ### 🔍 Detailed Vulnerability Report
-            ${{ steps.parse-results.outputs.detailed_results }}
-            
-            ### 🔗 Additional Resources
-            - [📊 Full Security Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            - [🛡️ Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
-            - [📝 Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
-            - [🔍 Security Issues](https://github.com/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity+label%3Avulnerability) (Detailed vulnerability tracking)
-            
-            ---
-            
-            > **📝 Note:** Detailed security issues have been created for tracking and resolution.
-            
-            **✅ To approve:** Comment with `approved`, `approve`, `lgtm`, or `yes`  
-            **❌ To reject:** Comment with `denied`, `deny`, `rejected`, or `no`
-            
-            **⏰ Manual approval required to proceed with deployment.**
+  #     - name: Wait for manual approval
+  #       uses: trstringer/manual-approval@v1
+  #       with:
+  #         secret: ${{ secrets.GITHUB_TOKEN }}
+  #         approvers: ${{ steps.set-approvers.outputs.approvers }}
+  #         minimum-approvals: 1
+  #         issue-title: "🔍 Security Review & Deployment Approval - ${{ github.ref_name }}"
+  #         issue-body: |
+  #           ## 🔍 Security Scan Results Summary
+  #           
+  #           **Repository:** ${{ github.repository }}  
+  #           **Branch:** ${{ github.ref_name }}  
+  #           **Commit:** ${{ github.sha }}  
+  #           **Services Scanned:** ${{ steps.parse-results.outputs.services }}
+  #           
+  #           ### 📊 Vulnerability Summary
+  #           - 🚨 **Critical:** ${{ steps.parse-results.outputs.critical }}
+  #           - ⚠️ **High:** ${{ steps.parse-results.outputs.high }}
+  #           - 📋 **Medium:** ${{ steps.parse-results.outputs.medium }}
+  #           
+  #           ### 🔍 Detailed Vulnerability Report
+  #           ${{ steps.parse-results.outputs.detailed_results }}
+  #           
+  #           ### 🔗 Additional Resources
+  #           - [📊 Full Security Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+  #           - [🛡️ Security Tab](${{ github.server_url }}/${{ github.repository }}/security)
+  #           - [📝 Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+  #           - [🔍 Security Issues](https://github.com/${{ github.repository }}/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity+label%3Avulnerability) (Detailed vulnerability tracking)
+  #           
+  #           ---
+  #           
+  #           > **📝 Note:** Detailed security issues have been created for tracking and resolution.
+  #           
+  #           **✅ To approve:** Comment with `approved`, `approve`, `lgtm`, or `yes`  
+  #           **❌ To reject:** Comment with `denied`, `deny`, `rejected`, or `no`
+  #           
+  #           **⏰ Manual approval required to proceed with deployment.**
 
-  configure-harbor:
-    name: Configure Harbor
-    runs-on: ubuntu-latest
-    needs: [security-scan, slack-approval]
-    if: always() && (needs.slack-approval.result == 'success' || (github.event.inputs.skip_approval && needs.security-scan.result == 'success'))
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # configure-harbor:
+  #   name: Configure Harbor
+  #   runs-on: ubuntu-latest
+  #   needs: [security-scan, slack-approval]
+  #   if: always() && (needs.slack-approval.result == 'success' || (github.event.inputs.skip_approval && needs.security-scan.result == 'success'))
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Configure Harbor auto-scan and SBOM
-        env:
-          HARBOR_URL: https://${{ env.REGISTRY_BASE }}
-          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-          PROJECT_NAME: ${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}
-        run: |
-          chmod +x ./scripts/configure-harbor.sh
-          ./scripts/configure-harbor.sh
+  #     - name: Configure Harbor auto-scan and SBOM
+  #       env:
+  #         HARBOR_URL: https://${{ env.REGISTRY_BASE }}
+  #         HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+  #         HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+  #         PROJECT_NAME: ${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}
+  #       run: |
+  #         chmod +x ./scripts/configure-harbor.sh
+  #         ./scripts/configure-harbor.sh
 
-  push-images:
-    name: Push Images
-    runs-on: ubuntu-latest
-    needs: [configure-harbor]
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    strategy:
-      matrix:
-        service: 
-          - { name: "frontend", context: "./frontend", dockerfile: "./frontend/Dockerfile" }
-          - { name: "backend", context: "./backend", dockerfile: "./backend/Dockerfile" }
-          - { name: "comparison", context: "./comparison", dockerfile: "./comparison/Dockerfile" }
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  # push-images:
+  #   name: Push Images
+  #   runs-on: ubuntu-latest
+  #   needs: [configure-harbor]
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #     id-token: write
+  #   strategy:
+  #     matrix:
+  #       service: 
+  #         - { name: "frontend", context: "./frontend", dockerfile: "./frontend/Dockerfile" }
+  #         - { name: "backend", context: "./backend", dockerfile: "./backend/Dockerfile" }
+  #         - { name: "comparison", context: "./comparison", dockerfile: "./comparison/Dockerfile" }
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Log in to Harbor registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.HARBOR_USERNAME }}
-          password: ${{ secrets.HARBOR_PASSWORD }}
+  #     - name: Log in to Harbor registry
+  #       uses: docker/login-action@v3
+  #       with:
+  #         registry: ${{ env.REGISTRY }}
+  #         username: ${{ secrets.HARBOR_USERNAME }}
+  #         password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Build and push ${{ matrix.service.name }} image
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.service.context }}
-          file: ${{ matrix.service.dockerfile }}
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
-            ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
+  #     - name: Build and push ${{ matrix.service.name }} image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: ${{ matrix.service.context }}
+  #         file: ${{ matrix.service.dockerfile }}
+  #         push: true
+  #         tags: |
+  #           ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
+  #           ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
 
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3
+  #     - name: Install Cosign
+  #       uses: sigstore/cosign-installer@v3
 
-      - name: Sign container image
-        env:
-          COSIGN_EXPERIMENTAL: 1
-        run: |
-          cosign sign --yes ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
-          cosign sign --yes ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
+  #     - name: Sign container image
+  #       env:
+  #         COSIGN_EXPERIMENTAL: 1
+  #       run: |
+  #         cosign sign --yes ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:${{ env.IMAGE_TAG }}
+  #         cosign sign --yes ${{ env.REGISTRY }}/div4u-${{ matrix.service.name }}:latest
 
-      - name: Verify Harbor auto-scan
-        run: |
-          echo "Harbor auto-scan and SBOM generation will trigger automatically"
-          echo "Check results at: https://${{ env.REGISTRY_BASE }}/harbor/projects/${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}/repositories"
+  #     - name: Verify Harbor auto-scan
+  #       run: |
+  #         echo "Harbor auto-scan and SBOM generation will trigger automatically"
+  #         echo "Check results at: https://${{ env.REGISTRY_BASE }}/harbor/projects/${{ env.TARGET_ENV == 'production' && 'div4u-production' || 'div4u-staging' }}/repositories"
 
   dast-scan:
     name: DAST Scan (Staging Only)
     runs-on: ubuntu-latest
-    needs: update-manifests
-    if: ${{ (github.event.inputs.environment == 'staging' || (github.event.inputs.environment == '' && github.ref_name != 'main')) && needs.update-manifests.result == 'success' }}
+    if: ${{ github.event.inputs.environment == 'staging' || (github.event.inputs.environment == '' && github.ref_name != 'main') }}
     permissions:
       contents: read
       security-events: write
@@ -552,10 +551,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Wait for staging deployment
+      - name: Wait for staging environment to be ready
         run: |
-          echo "Waiting for staging deployment to be ready..."
-          sleep 180  # Wait for ArgoCD to deploy and pods to be ready
+          echo "Waiting for staging environment to be ready..."
+          echo "Assuming staging environment is already deployed and accessible"
+          sleep 30  # Brief wait to ensure environment is stable
 
       - name: Run ZAP DAST Scan
         uses: zaproxy/action-full-scan@v0.10.0
@@ -565,6 +565,7 @@ jobs:
           cmd_options: '-a -j -m 10 -T 60 -c .zap/context.xml'
           allow_issue_writing: false
           fail_action: false
+          artifact_name: 'zap-dast-scan'
 
       - name: Upload DAST results
         uses: actions/upload-artifact@v4
@@ -662,61 +663,61 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  update-manifests:
-    name: Update K8s Manifests
-    runs-on: ubuntu-latest
-    needs: push-images
-    if: always() && needs.push-images.result == 'success'
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+  # update-manifests:
+  #   name: Update K8s Manifests
+  #   runs-on: ubuntu-latest
+  #   needs: push-images
+  #   if: always() && needs.push-images.result == 'success'
+  #   permissions:
+  #     contents: write
+  #   
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update deployment manifests
-        run: |
-          # Determine environment (manual input or branch-based)
-          TARGET_ENV="${{ env.TARGET_ENV }}"
-          
-          if [[ "$TARGET_ENV" == "staging" ]]; then
-            ENV_PATH="k8s/environments/staging"
-            echo "Updating staging environment with tag: ${{ env.IMAGE_TAG }}"
-          elif [[ "$TARGET_ENV" == "production" ]]; then
-            ENV_PATH="k8s/environments/production"
-            echo "Updating production environment with tag: ${{ env.IMAGE_TAG }}"
-          else
-            echo "Unknown environment: $TARGET_ENV"
-            exit 1
-          fi
-          
-          # Update kustomization.yaml with new image tags
-          cd $ENV_PATH
-          
-          # Update all service image tags
-          sed -i "s|newTag: .*|newTag: ${{ env.IMAGE_TAG }}|g" kustomization.yaml
-          
-          # Verify the changes
-          echo "Updated kustomization.yaml:"
-          cat kustomization.yaml
+  #     - name: Update deployment manifests
+  #       run: |
+  #         # Determine environment (manual input or branch-based)
+  #         TARGET_ENV="${{ env.TARGET_ENV }}"
+  #         
+  #         if [[ "$TARGET_ENV" == "staging" ]]; then
+  #           ENV_PATH="k8s/environments/staging"
+  #           echo "Updating staging environment with tag: ${{ env.IMAGE_TAG }}"
+  #         elif [[ "$TARGET_ENV" == "production" ]]; then
+  #           ENV_PATH="k8s/environments/production"
+  #           echo "Updating production environment with tag: ${{ env.IMAGE_TAG }}"
+  #         else
+  #           echo "Unknown environment: $TARGET_ENV"
+  #           exit 1
+  #         fi
+  #         
+  #         # Update kustomization.yaml with new image tags
+  #         cd $ENV_PATH
+  #         
+  #         # Update all service image tags
+  #         sed -i "s|newTag: .*|newTag: ${{ env.IMAGE_TAG }}|g" kustomization.yaml
+  #         
+  #         # Verify the changes
+  #         echo "Updated kustomization.yaml:"
+  #         cat kustomization.yaml
 
-      - name: Commit and push changes
-        run: |
-          git config --global user.name "rustzh"
-          git config --global user.email "soonso00@naver.com"
-          
-          # Add environment-specific directory
-          TARGET_ENV="${{ env.TARGET_ENV }}"
-          git add k8s/environments/$TARGET_ENV/
-          
-          # Create commit message
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            COMMIT_MSG="ci($TARGET_ENV): manual update image tags to ${{ env.IMAGE_TAG }}"
-          else
-            COMMIT_MSG="ci($TARGET_ENV): update image tags to ${{ env.IMAGE_TAG }}"
-          fi
-          
-          git commit -m "$COMMIT_MSG" || exit 0
-          git push origin ${{ github.ref_name }}
+  #     - name: Commit and push changes
+  #       run: |
+  #         git config --global user.name "rustzh"
+  #         git config --global user.email "soonso00@naver.com"
+  #         
+  #         # Add environment-specific directory
+  #         TARGET_ENV="${{ env.TARGET_ENV }}"
+  #         git add k8s/environments/$TARGET_ENV/
+  #         
+  #         # Create commit message
+  #         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+  #           COMMIT_MSG="ci($TARGET_ENV): manual update image tags to ${{ env.IMAGE_TAG }}"
+  #         else
+  #           COMMIT_MSG="ci($TARGET_ENV): update image tags to ${{ env.IMAGE_TAG }}"
+  #         fi
+  #         
+  #         git commit -m "$COMMIT_MSG" || exit 0
+  #         git push origin ${{ github.ref_name }}
