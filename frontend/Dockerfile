@@ -3,9 +3,6 @@
 # Stage 1: Build stage
 FROM node:18-alpine AS builder
 
-# cross-spawn 취약점 해결 (CVE-2024-21538)
-RUN npm install -g cross-spawn@7.0.6
-
 # 작업 디렉토리 설정
 WORKDIR /app
 
@@ -13,7 +10,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 의존성 설치 (개발 의존성 포함)
-RUN npm install
+RUN npm ci
 
 # 소스 코드 복사
 COPY . .
@@ -32,8 +29,10 @@ ENV VITE_APP_VERSION=$VITE_APP_VERSION
 # React 앱 빌드
 RUN npm run build
 
-# BFF 서버 파일 준비
-RUN npm run copy:server
+# BFF 서버 파일을 dist 디렉토리로 복사
+RUN cp server.js dist/ && \
+    cp package.json dist/ && \
+    echo '{"type":"module","dependencies":{"express":"^4.18.2","http-proxy-middleware":"^2.0.6"}}' > dist/package.json
 
 # Stage 2: BFF Runtime
 FROM node:18-alpine

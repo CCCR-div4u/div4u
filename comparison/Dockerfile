@@ -1,9 +1,6 @@
 # Node.js 18 Alpine 이미지 사용 (경량화)
 FROM node:18-alpine
 
-# cross-spawn 취약점 해결 (CVE-2024-21538)
-RUN npm install -g cross-spawn@7.0.6
-
 # 작업 디렉토리 설정
 WORKDIR /app
 
@@ -11,7 +8,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 의존성 설치 (빌드용 전체 설치)
-RUN npm install
+RUN npm ci
 
 # 소스 코드 복사
 COPY . .
