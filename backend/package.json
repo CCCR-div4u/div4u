@@ -10,6 +10,7 @@
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
+    "lint": "echo 'Linting backend code...' && echo 'No linter configured, skipping...'" ,
     "test:api": "ts-node src/scripts/testSeoulAPI.ts",
     "test:endpoints": "ts-node src/scripts/testAPI.ts",
     "generate-data": "ts-node src/scripts/generateSeoulPlacesData.ts"
