@@ -293,9 +293,21 @@ jobs:
           
           # Save detailed results to file for GitHub Issue
           echo "$DETAILED_RESULTS" > detailed_results.txt
-          echo "detailed_results<<EOF" >> $GITHUB_OUTPUT
-          echo "$DETAILED_RESULTS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # echo "detailed_results<<EOF" >> $GITHUB_OUTPUT
+          # echo "$DETAILED_RESULTS" >> $GITHUB_OUTPUT
+          # echo "EOF" >> $GITHUB_OUTPUT
+
+          # Properly format multiline output for GitHub Actions
+          # Replace literal \n with actual newlines for proper markdown formatting
+          FORMATTED_RESULTS=$(echo "$DETAILED_RESULTS" | sed 's/\\n/\
+          /g')
+          
+          # Use proper multiline output format
+          {
+            echo "detailed_results<<EOF"
+            printf "%s\n" "$FORMATTED_RESULTS"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Send Slack approval request
         uses: 8398a7/action-slack@v3
