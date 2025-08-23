@@ -27,13 +27,13 @@ patches:
 images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-backend
-  newTag: 12a4c97da3227dd01bf8ca006db25d940d0f436f
+  newTag: abae861919bcc1fbffaccad09abaea370e103b59
 - name: harbor.bluesunnywings.com/div4u/div4u-frontend
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-frontend
-  newTag: 12a4c97da3227dd01bf8ca006db25d940d0f436f
+  newTag: abae861919bcc1fbffaccad09abaea370e103b59
 - name: harbor.bluesunnywings.com/div4u/div4u-comparison
   newName: harbor.bluesunnywings.com/div4u-staging/div4u-comparison
-  newTag: 12a4c97da3227dd01bf8ca006db25d940d0f436f
+  newTag: abae861919bcc1fbffaccad09abaea370e103b59
 
 labels:
 - pairs:
