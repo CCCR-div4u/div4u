@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  # Common
+  NODE_ENV: "production"
+  
+  # Backend
+  CORS_ORIGIN: "https://www.div4u.com"
+  SEOUL_API_BASE_URL: "http://openapi.seoul.go.kr:8088"
+  
+  # Frontend - Ingress를 통한 API 호출
+  VITE_API_BASE_URL: "/api"
+  VITE_COMPARISON_API_URL: "/api/comparison"
+  VITE_APP_NAME: "div4u"
+  VITE_APP_VERSION: "1.0.0"
+  
+  # Comparison - Kubernetes Service DNS 사용
+  COMPARISON_PORT: "3002"
+  # 같은 네임스페이스 내 서비스 통신 (Kubernetes DNS)
+  BACKEND_SERVICE_NAME: "div4u-backend-service"
+  BACKEND_SERVICE_PORT: "3001"
+  # 또는 직접 URL (Kubernetes DNS 방식)
+  CORE_API_URL: "http://div4u-backend-service:3001/api"
+  CACHE_TTL_MINUTES: "5"
+  ALLOWED_ORIGINS: "https://www.div4u.com"
+  LOG_LEVEL: "warn"

@@ -24,7 +24,8 @@
     "clsx": "^2.0.0",
     "tailwind-merge": "^2.0.0",
     "@radix-ui/react-slot": "^1.0.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "cross-spawn": "^7.0.5"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",

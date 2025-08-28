@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: div4u-production
+
+resources:
+- ../../base/backend
+- ../../base/frontend
+- ../../base/comparison
+- ../../base/common
+
+patches:
+- path: patches/configmap-production.yaml
+  target:
+    kind: ConfigMap
+    name: app-config
+- path: patches/ingress-production.yaml
+  target:
+    kind: Ingress
+    name: div4u-ingress
+    
+- path: patches/frontend-service-urls.yaml
+  target:
+    kind: Deployment
+    name: div4u-frontend
+
+replicas:
+- name: div4u-backend
+  count: 3
+- name: div4u-frontend
+  count: 3
+- name: div4u-comparison
+  count: 2
+
+images:
+- name: harbor.bluesunnywings.com/div4u/div4u-backend
+  newName: harbor.bluesunnywings.com/div4u-production/div4u-backend
+  newTag: PLACEHOLDER
+- name: harbor.bluesunnywings.com/div4u/div4u-frontend
+  newName: harbor.bluesunnywings.com/div4u-production/div4u-frontend
+  newTag: PLACEHOLDER
+- name: harbor.bluesunnywings.com/div4u/div4u-comparison
+  newName: harbor.bluesunnywings.com/div4u-production/div4u-comparison
+  newTag: PLACEHOLDER
+
+labels:
+- pairs:
+    environment: production
+
+namePrefix: prod-

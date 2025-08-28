@@ -95,7 +95,7 @@ export class ComparisonApiService {
         comparisons: ComparisonResult[];
         analysis: ComparisonAnalysis;
         timestamp: string;
-      }>('/api/comparison/compare', request);
+      }>('/compare', request);
 
       const duration = Date.now() - startTime;
       
@@ -132,7 +132,7 @@ export class ComparisonApiService {
     const startTime = Date.now();
     
     try {
-      await this.client.get('/api/comparison/health');
+      await this.client.get('/health');
       
       return {
         available: true,
@@ -156,7 +156,7 @@ export class ComparisonApiService {
     error?: string;
   }> {
     try {
-      const response = await this.client.get('/api/comparison/cache-stats');
+      const response = await this.client.get('/cache-stats');
       return response;
     } catch (error: any) {
       return {
@@ -175,7 +175,7 @@ export class ComparisonApiService {
     error?: string;
   }> {
     try {
-      const response = await this.client.get('/api/comparison/info');
+      const response = await this.client.get('/info');
       return {
         success: true,
         data: response

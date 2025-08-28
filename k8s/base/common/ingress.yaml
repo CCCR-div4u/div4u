@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: div4u-ingress
+  labels:
+    app: div4u-ingress
+  annotations:
+    # AWS Load Balancer Controller 설정
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: div4u-ingress
+    
+    # SSL/TLS 설정 (AWS Certificate Manager ARN 사용)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:219967435143:certificate/f11a303c-a7df-437a-ae64-28843851eaa5
+    
+    # 헬스체크 설정
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+    
+    # 추가 설정
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/success-codes: '200'
+    
+spec:
+  ingressClassName: alb
+  rules:
+  # 메인 도메인 (환경별로 패치됨)
+  - host: PLACEHOLDER_DOMAIN
+    http:
+      paths:
+      # 프론트엔드 (SPA) - 가장 낮은 우선순위
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: div4u-frontend-service
+            port:
+              number: 80
