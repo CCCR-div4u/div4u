@@ -35,13 +35,13 @@ replicas:
 images:
 - name: harbor.bluesunnywings.com/div4u/div4u-backend
   newName: harbor.bluesunnywings.com/div4u-production/div4u-backend
-  newTag: PLACEHOLDER
+  newTag: dcf955fbda41d028dbe3617b9e918962de3eebda
 - name: harbor.bluesunnywings.com/div4u/div4u-frontend
   newName: harbor.bluesunnywings.com/div4u-production/div4u-frontend
-  newTag: PLACEHOLDER
+  newTag: dcf955fbda41d028dbe3617b9e918962de3eebda
 - name: harbor.bluesunnywings.com/div4u/div4u-comparison
   newName: harbor.bluesunnywings.com/div4u-production/div4u-comparison
-  newTag: PLACEHOLDER
+  newTag: dcf955fbda41d028dbe3617b9e918962de3eebda
 
 labels:
 - pairs:
