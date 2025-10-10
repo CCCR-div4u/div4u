@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-test-app
+  namespace: div4u-dev
+  labels:
+    app: vulnerable-test
+    environment: test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnerable-test
+  template:
+    metadata:
+      labels:
+        app: vulnerable-test
+    spec:
+      # 취약점 1: 권한 있는 컨테이너 실행
+      securityContext:
+        runAsUser: 0  # root 사용자로 실행
+        runAsGroup: 0
+        fsGroup: 0
+      containers:
+      - name: vulnerable-app
+        image: nginx:1.14  # 취약점 2: 오래된 이미지 버전
+        ports:
+        - containerPort: 80
+        - containerPort: 22  # 취약점 3: SSH 포트 노출
+        - containerPort: 3306  # 취약점 4: MySQL 포트 노출
+        # 취약점 5: 리소스 제한 없음 (DoS 공격 가능)
+        # resources 설정 없음
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password123"  # 취약점 6: 하드코딩된 패스워드
+        - name: API_KEY
+          value: "sk-1234567890abcdef"  # 취약점 7: 하드코딩된 API 키
+        securityContext:
+          # 취약점 8: 권한 있는 컨테이너
+          privileged: true
+          # 취약점 9: 모든 capability 허용
+          allowPrivilegeEscalation: true
+          # 취약점 10: 읽기 전용 파일시스템 미사용
+          readOnlyRootFilesystem: false
+          # 취약점 11: 루트 사용자 허용
+          runAsNonRoot: false
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+          # 취약점 12: 호스트 파일시스템 마운트
+        - name: docker-socket
+          mountPath: /var/run/docker.sock
+          # 취약점 13: Docker 소켓 마운트
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      # 취약점 14: 호스트 네트워크 사용
+      hostNetwork: true
+      # 취약점 15: 호스트 PID 네임스페이스 사용
+      hostPID: true
+      # 취약점 16: 호스트 IPC 네임스페이스 사용
+      hostIPC: true
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vulnerable-test-service
+  namespace: div4u-dev
+spec:
+  type: NodePort  # 취약점 17: NodePort로 외부 노출
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080  # 취약점 18: 고정 NodePort
+  - port: 22
+    targetPort: 22
+    nodePort: 30022  # 취약점 19: SSH 포트 외부 노출
+  - port: 3306
+    targetPort: 3306
+    nodePort: 30306  # 취약점 20: 데이터베이스 포트 외부 노출
+  selector:
+    app: vulnerable-test
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vulnerable-config
+  namespace: div4u-dev
+data:
+  database_password: "admin123"  # 취약점 21: ConfigMap에 패스워드 저장
+  api_secret: "secret-key-123"   # 취약점 22: ConfigMap에 시크릿 저장
+  debug_mode: "true"             # 취약점 23: 프로덕션에서 디버그 모드
+  test_trigger: "workflow-test"  # 워크플로우 테스트 트리거

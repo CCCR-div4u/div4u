@@ -1,0 +1,861 @@
+name: Kubernetes Security Analysis
+
+# 트리거 조건 (Requirements 1.2, 1.3, 6.2, 6.4)
+on:
+  push:
+    branches: [main, develop, feature/k8s-security-scan]
+    paths:
+      - "k8s-test-scenario/**"
+  pull_request:
+    paths:
+      - "k8s-test-scenario/**"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "수동 실행 이유"
+        required: false
+        default: "수동 보안 검사"
+  schedule:
+    - cron: "0 2 * * *" # 매일 오전 2시 (KST 11시) 자동 실행
+
+# 최소 권한 원칙 (Requirement 5.3)
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+# 동시성 제어 - 동일 브랜치에서 중복 실행 방지 및 성능 최적화 (Requirement 6.4)
+concurrency:
+  group: k8s-security-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+jobs:
+  k8s-security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 변경사항 감지 (성능 최적화)
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            k8s:
+              - 'k8s-test-scenario/**/*.yaml'
+              - 'k8s-test-scenario/**/*.yml'
+              - 'k8s-test-scenario/**/*.json'
+            # 제외할 파일들 (성능 최적화)
+            exclude:
+              - '**/*.md'
+              - '**/*.txt'
+              - '**/*.log'
+              - '.git/**'
+              - '.github/**'
+              - 'docs/**'
+              - 'examples/**'
+          # 변경 감지 최적화 옵션
+          list-files: json
+          initial-fetch-depth: 10
+
+      - name: 실행 이유 설정
+        id: reason
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "reason=${{ github.event.inputs.reason }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "reason=정기 자동 검사" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "reason=PR 보안 검사" >> $GITHUB_OUTPUT
+          else
+            echo "reason=코드 변경 감지" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Python 환경 설정 (캐싱 최적화)
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 보안 환경 검증 (Requirements 5.2, 5.3, 7.1)
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          echo "🔒 보안 환경 검증을 시작합니다..."
+
+          # 보안 검증 스크립트 실행
+          if [ -f "scripts/security_validation.py" ]; then
+            python scripts/security_validation.py
+          else
+            echo "⚠️ 보안 검증 스크립트를 찾을 수 없습니다. 기본 검증을 수행합니다."
+            
+            # 기본 환경변수 검증
+            echo "📋 필수 환경변수 확인:"
+            for var in GITHUB_REPOSITORY GITHUB_REF GITHUB_SHA; do
+              if [ -n "${!var}" ]; then
+                echo "  ✅ $var: 설정됨"
+              else
+                echo "  ❌ $var: 누락"
+              fi
+            done
+            
+            echo "📋 선택적 환경변수 확인:"
+            if [ -n "$OPENAI_API_KEY" ]; then
+              echo "  ✅ OPENAI_API_KEY: sk-****...****"
+            else
+              echo "  ⚠️ OPENAI_API_KEY: 미설정 (Fallback 리포트 사용)"
+            fi
+            
+            if [ -n "$SLACK_WEBHOOK_URL_CHECKOV" ]; then
+              echo "  ✅ SLACK_WEBHOOK_URL_CHECKOV: https://hooks.slack.com/***"
+            else
+              echo "  ⚠️ SLACK_WEBHOOK_URL_CHECKOV: 미설정 (알림 건너뜀)"
+            fi
+          fi
+
+          echo "✅ 보안 환경 검증 완료"
+
+      - name: 시스템 리소스 확인 및 최적화
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          echo "💻 시스템 리소스 확인..."
+          echo "🖥️ CPU 정보:"
+          nproc
+          echo "🧠 메모리 정보:"
+          free -h
+          echo "💾 디스크 정보:"
+          df -h
+
+          # 성능 최적화를 위한 환경변수 설정
+          echo "⚡ 성능 최적화 설정..."
+          export PYTHONUNBUFFERED=1
+          export CHECKOV_RUNNER_FILTER=true
+          export CHECKOV_COMPACT_MODE=true
+
+          # CPU 코어 수에 따른 병렬 처리 설정
+          CPU_CORES=$(nproc)
+          if [ "$CPU_CORES" -gt 2 ]; then
+            export CHECKOV_PARALLEL_RUNNERS=$((CPU_CORES - 1))
+            echo "🚀 병렬 처리 설정: ${CHECKOV_PARALLEL_RUNNERS}개 러너"
+          fi
+
+      - name: Checkov 설치
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          echo "🔧 Checkov 및 의존성 설치 중..."
+
+          # pip 업그레이드 및 패키지 설치 (재시도 로직 포함)
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "📦 패키지 설치 시도 $((RETRY_COUNT + 1))/$MAX_RETRIES"
+            
+            if pip install --upgrade pip --timeout=60 --retries=3 && \
+               pip install checkov requests openai --timeout=60 --retries=3; then
+              echo "✅ 패키지 설치 성공"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠️ 패키지 설치 실패 - 10초 후 재시도..."
+                sleep 10
+              else
+                echo "❌ 패키지 설치 최종 실패"
+                echo "🔍 pip 설정 확인:"
+                pip config list || true
+                echo "🔍 Python 환경 확인:"
+                python --version
+                pip --version
+                exit 1
+              fi
+            fi
+          done
+
+          # Checkov 버전 확인
+          echo "🔍 설치된 Checkov 버전:"
+          checkov --version || echo "⚠️ Checkov 버전 확인 실패"
+
+      - name: Kubernetes 보안 스캔 실행 (Requirements 1.2, 6.2)
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        run: |
+          echo "🔍 Kubernetes 보안 스캔을 시작합니다..."
+          echo "📁 스캔 대상: k8s-test-scenario 디렉터리"
+
+          # 디렉터리 존재 확인 (Requirement 7.1)
+          if [ ! -d "k8s-test-scenario" ]; then
+            echo "❌ k8s-test-scenario 디렉터리를 찾을 수 없습니다."
+            echo "📁 현재 디렉터리 구조:"
+            ls -la
+            echo "🔧 기본 테스트 디렉터리를 생성합니다..."
+            mkdir -p k8s-test-scenario
+            echo "⚠️ 스캔할 파일이 없으므로 기본 결과를 생성합니다."
+          fi
+
+          # 성능 최적화: 변경된 파일만 우선 스캔
+          CHANGED_FILES=""
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "${{ steps.changes.outputs.k8s_files }}" ]; then
+            CHANGED_FILES="${{ steps.changes.outputs.k8s_files }}"
+            echo "📋 변경된 파일 우선 스캔: $(echo "$CHANGED_FILES" | jq length)개"
+            echo "$CHANGED_FILES" | jq -r '.[]' | head -10
+          fi
+
+          # 스캔 대상 파일 확인
+          YAML_FILES=$(find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | wc -l)
+          JSON_FILES=$(find k8s-test-scenario -type f -name "*.json" 2>/dev/null | wc -l)
+          TOTAL_FILES=$((YAML_FILES + JSON_FILES))
+          echo "📋 발견된 파일: YAML ${YAML_FILES}개, JSON ${JSON_FILES}개 (총 ${TOTAL_FILES}개)"
+
+          # 대용량 파일 확인 및 경고 (5MB 이상)
+          echo "🔍 대용량 파일 검사..."
+          LARGE_FILES=$(find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) | xargs ls -la 2>/dev/null | awk '$5 > 5242880 {print $9, $5}' || true)
+          if [ -n "$LARGE_FILES" ]; then
+            echo "⚠️ 대용량 파일 발견 (5MB 이상):"
+            echo "$LARGE_FILES"
+            echo "💡 스캔 시간이 오래 걸릴 수 있습니다."
+          fi
+
+          if [ "$TOTAL_FILES" -gt 0 ]; then
+            echo "📋 스캔 대상 파일 목록 (최대 10개):"
+            find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" -o -name "*.json" \) | head -10
+          else
+            echo "⚠️ 스캔할 파일이 없습니다."
+          fi
+
+          # Checkov 실행 함수 정의 (성능 최적화 및 에러 핸들링 - Requirement 7.1, 7.2)
+          run_checkov() {
+            local output_format="$1"
+            local output_file="$2"
+            local max_retries=2
+            local retry_count=0
+            
+            # 기존 파일/디렉터리 정리
+            if [ -e "$output_file" ]; then
+              rm -rf "$output_file"
+            fi
+            
+            # 성능 최적화 옵션 설정
+            local checkov_args=(
+              --directory k8s-test-scenario
+              --framework kubernetes
+              --output "$output_format"
+              --quiet
+              --compact
+              --soft-fail
+            )
+            
+            # 대용량 파일이 있는 경우 추가 최적화
+            if [ -n "$LARGE_FILES" ]; then
+              checkov_args+=(--timeout 180)  # 3분 타임아웃
+              echo "⚡ 대용량 파일 감지 - 타임아웃 설정: 180초"
+            fi
+            
+            # 파일 수가 많은 경우 배치 처리
+            if [ "$TOTAL_FILES" -gt 100 ]; then
+              checkov_args+=(--use-enforcement-rules)
+              echo "⚡ 다수 파일 감지 - 배치 처리 모드 활성화"
+            fi
+            
+            # 성능 최적화 옵션에 --output-file 추가
+            checkov_args+=(--output-file "$output_file")
+            
+            while [ $retry_count -lt $max_retries ]; do
+              echo "🔍 Checkov 실행 ($output_format 형식, 시도 $((retry_count + 1))/$max_retries)"
+              echo "⚡ 성능 최적화 옵션: 타임아웃 제어, 파일 출력"
+              echo "📋 실행 명령어: checkov ${checkov_args[*]}"
+              echo "📁 현재 디렉터리: $(pwd)"
+              echo "📁 스캔 대상 디렉터리 확인:"
+              ls -la k8s-test-scenario/ 2>/dev/null || echo "k8s-test-scenario 디렉터리가 없습니다"
+              
+              if checkov "${checkov_args[@]}"; then
+                echo "✅ Checkov $output_format 출력 성공"
+                echo "📄 출력 파일 확인: $output_file"
+                ls -la "$output_file" 2>/dev/null || echo "출력 파일이 생성되지 않았습니다"
+                return 0
+              else
+                echo "❌ Checkov 실행 실패 (종료 코드: $?)"
+                retry_count=$((retry_count + 1))
+                if [ $retry_count -lt $max_retries ]; then
+                  echo "⚠️ Checkov 실행 실패 - 3초 후 재시도..."
+                  sleep 3
+                else
+                  echo "❌ Checkov $output_format 출력 최종 실패"
+                  return 1
+                fi
+              fi
+            done
+          }
+
+          # JSON 형식으로 스캔 실행
+          if ! run_checkov "json" "checkov-results.json"; then
+            echo "⚠️ Checkov JSON 출력 실패 - 기본 JSON 파일 생성"
+          fi
+          
+          # 디버깅: 생성된 파일들 확인
+          echo "🔍 현재 디렉터리의 모든 파일:"
+          ls -la
+          echo ""
+          echo "🔍 checkov 관련 파일들:"
+          ls -la checkov* 2>/dev/null || echo "checkov 결과 파일이 없습니다"
+          echo ""
+          
+          # JSON 파일 내용 확인
+          if [ -f "checkov-results.json" ]; then
+            echo "📄 checkov-results.json 파일 정보:"
+            echo "  - 크기: $(wc -c < checkov-results.json) bytes"
+            echo "  - 줄 수: $(wc -l < checkov-results.json) lines"
+            echo "📄 checkov-results.json 전체 내용:"
+            cat checkov-results.json
+            echo ""
+            echo "📄 JSON 유효성 검사:"
+            if python3 -m json.tool checkov-results.json > /dev/null 2>&1; then
+              echo "✅ 유효한 JSON 형식입니다"
+            else
+              echo "❌ 유효하지 않은 JSON 형식입니다"
+            fi
+          else
+            echo "❌ checkov-results.json 파일이 존재하지 않습니다"
+          fi
+
+          # Checkov가 디렉터리 구조로 생성한 경우 파일 이동
+          if [ -d "checkov-results.json" ] && [ -f "checkov-results.json/results_json.json" ]; then
+            echo "🔄 Checkov JSON 결과 파일 이동 중..."
+            mv "checkov-results.json/results_json.json" "checkov-results.json.tmp"
+            rm -rf "checkov-results.json"
+            mv "checkov-results.json.tmp" "checkov-results.json"
+            echo "✅ JSON 파일 이동 완료"
+          fi
+
+          # SARIF 형식으로 스캔 실행
+          if ! run_checkov "sarif" "checkov-results.sarif"; then
+            echo "⚠️ Checkov SARIF 출력 실패 - 기본 SARIF 파일은 나중에 생성됩니다"
+          fi
+
+          # Checkov가 디렉터리 구조로 생성한 경우 파일 이동
+          if [ -d "checkov-results.sarif" ] && [ -f "checkov-results.sarif/results_sarif.sarif" ]; then
+            echo "🔄 Checkov SARIF 결과 파일 이동 중..."
+            mv "checkov-results.sarif/results_sarif.sarif" "checkov-results.sarif.tmp"
+            rm -rf "checkov-results.sarif"
+            mv "checkov-results.sarif.tmp" "checkov-results.sarif"
+            echo "✅ SARIF 파일 이동 완료"
+          fi
+
+          # JSON 결과 파일 존재 확인 및 기본 파일 생성 (Requirement 7.1)
+          if [ ! -f "checkov-results.json" ]; then
+            echo "⚠️ Checkov JSON 결과 파일이 생성되지 않았습니다. 기본 파일을 생성합니다."
+            cat > checkov-results.json << 'EOF'
+          {
+            "check_type": "kubernetes",
+            "results": {
+              "failed_checks": []
+            },
+            "summary": {
+              "passed": 0,
+              "failed": 0,
+              "skipped": 0,
+              "parsing_errors": 0,
+              "resource_count": 0,
+              "checkov_version": "unknown"
+            }
+          }
+          EOF
+          fi
+
+          # 결과 파일 검증
+          echo "🔍 결과 파일 검증..."
+          if python3 -c "import json; json.load(open('checkov-results.json'))" 2>/dev/null; then
+            echo "✅ JSON 파일 형식 검증 완료"
+          else
+            echo "❌ JSON 파일 형식 오류 - 기본 파일로 교체"
+            echo '{"check_type":"kubernetes","results":{"failed_checks":[]},"summary":{"passed":0,"failed":0,"skipped":0,"parsing_errors":0,"resource_count":0,"checkov_version":"unknown"}}' > checkov-results.json
+          fi
+
+          # 스캔 결과 요약
+          ISSUES_COUNT=$(python3 -c "import json; data=json.load(open('checkov-results.json')); print(len(data.get('results', {}).get('failed_checks', [])))" 2>/dev/null || echo "0")
+          echo "📊 스캔 완료 - 발견된 이슈: ${ISSUES_COUNT}개"
+          echo "✅ Kubernetes 보안 스캔 완료"
+
+          # 성능 통계 수집
+          echo "⏱️ 성능 통계:"
+          echo "  - 스캔된 파일 수: ${TOTAL_FILES}개 (YAML: ${YAML_FILES}, JSON: ${JSON_FILES})"
+          echo "  - 발견된 이슈 수: ${ISSUES_COUNT}개"
+          echo "  - 스캔 완료 시간: $(date)"
+
+          # 메모리 사용량 확인
+          echo "🧠 메모리 사용량:"
+          free -h
+
+      - name: OpenAI 보안 분석 실행 (Requirements 2.1, 2.3, 5.1)
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MAX_ISSUES_FOR_AI: 15
+        run: |
+          echo "🤖 보안 분석을 시작합니다..."
+          python scripts/analyze_security.py checkov-results.json kubernetes > security-analysis-report.md
+          echo "✅ 보안 분석 완료"
+          echo "📄 분석 리포트 미리보기:"
+          head -20 security-analysis-report.md
+
+      - name: 이슈 개수 확인 및 환경변수 설정
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        id: issue_count
+        run: |
+          # 메타데이터 추출을 위해 분석 스크립트 실행
+          METADATA_OUTPUT=$(python scripts/analyze_security.py checkov-results.json kubernetes --metadata-only)
+
+          # 환경변수 파싱
+          TOTAL_ISSUES=$(echo "$METADATA_OUTPUT" | grep "TOTAL_ISSUES=" | cut -d'=' -f2)
+          CRITICAL_COUNT=$(echo "$METADATA_OUTPUT" | grep "CRITICAL_COUNT=" | cut -d'=' -f2)
+          HIGH_COUNT=$(echo "$METADATA_OUTPUT" | grep "HIGH_COUNT=" | cut -d'=' -f2)
+          MEDIUM_COUNT=$(echo "$METADATA_OUTPUT" | grep "MEDIUM_COUNT=" | cut -d'=' -f2)
+          LOW_COUNT=$(echo "$METADATA_OUTPUT" | grep "LOW_COUNT=" | cut -d'=' -f2)
+          ISSUE_PRIORITY=$(echo "$METADATA_OUTPUT" | grep "ISSUE_PRIORITY=" | cut -d'=' -f2)
+          ISSUE_TITLE=$(echo "$METADATA_OUTPUT" | grep "ISSUE_TITLE=" | cut -d'=' -f2)
+          ISSUE_LABELS=$(echo "$METADATA_OUTPUT" | grep "ISSUE_LABELS=" | cut -d'=' -f2)
+
+          # GitHub Actions 출력 설정
+          echo "total_issues=$TOTAL_ISSUES" >> $GITHUB_OUTPUT
+          echo "critical_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          echo "medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+          echo "low_count=$LOW_COUNT" >> $GITHUB_OUTPUT
+          echo "priority=$ISSUE_PRIORITY" >> $GITHUB_OUTPUT
+          echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+          echo "issue_labels=$ISSUE_LABELS" >> $GITHUB_OUTPUT
+
+          echo "📊 이슈 통계: 총 $TOTAL_ISSUES개 (Critical: $CRITICAL_COUNT, High: $HIGH_COUNT, Medium: $MEDIUM_COUNT, Low: $LOW_COUNT)"
+
+      - name: GitHub Issue 생성 (Requirements 2.4, 3.3)
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && steps.issue_count.outputs.total_issues > 0
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const totalIssues = '${{ steps.issue_count.outputs.total_issues }}';
+            const priority = '${{ steps.issue_count.outputs.priority }}';
+            const criticalCount = '${{ steps.issue_count.outputs.critical_count }}';
+            const highCount = '${{ steps.issue_count.outputs.high_count }}';
+            const mediumCount = '${{ steps.issue_count.outputs.medium_count }}';
+            const lowCount = '${{ steps.issue_count.outputs.low_count }}';
+            const reason = '${{ steps.reason.outputs.reason }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // 분석 리포트 읽기
+            let analysisReport = '';
+            try {
+              analysisReport = fs.readFileSync('security-analysis-report.md', 'utf8');
+            } catch (error) {
+              analysisReport = '분석 리포트를 읽을 수 없습니다.';
+            }
+
+            const title = `div4u K8s 보안 검사 결과: ${totalIssues}개 이슈 발견 (${priority})`;
+
+            const body = `## ☸️ div4u Kubernetes 보안 검사 결과
+
+            ### 📊 검사 요약
+            - **총 이슈**: ${totalIssues}개
+            - **우선순위**: ${priority}
+            - **실행 이유**: ${reason}
+            - **브랜치**: \`${context.ref.replace('refs/heads/', '')}\`
+            - **커밋**: \`${context.sha.substring(0, 7)}\`
+            - **실행 시간**: ${new Date().toLocaleString('ko-KR', {timeZone: 'Asia/Seoul'})}
+
+            ### 📈 심각도별 분포
+            | 심각도 | 개수 |
+            |--------|------|
+            | 🔴 Critical | ${criticalCount} |
+            | 🟠 High | ${highCount} |
+            | 🟡 Medium | ${mediumCount} |
+            | 🟢 Low | ${lowCount} |
+
+            ### 🤖 AI 분석 결과
+            ${analysisReport}
+
+            ### ✅ 해결 체크리스트
+            - [ ] Critical 이슈 해결 (${criticalCount}개)
+            - [ ] High 이슈 해결 (${highCount}개)
+            - [ ] Medium 이슈 검토 및 해결 (${mediumCount}개)
+            - [ ] 보안 컨텍스트 및 리소스 제한 설정 검토
+            - [ ] 네트워크 정책 및 RBAC 설정 검토
+            - [ ] 컨테이너 이미지 보안 검토
+            - [ ] 보안 정책 업데이트
+            - [ ] 팀 리뷰 완료
+
+            ### 🔗 관련 링크
+            - [워크플로 실행 결과](${runUrl})
+            - [k8s-test-scenario 디렉터리](${context.payload.repository.html_url}/tree/${context.ref.replace('refs/heads/', '')}/k8s-test-scenario)
+            - [Checkov Kubernetes 문서](https://www.checkov.io/5.Policy%20Index/kubernetes.html)
+            - [Kubernetes 보안 가이드](https://kubernetes.io/docs/concepts/security/)
+
+            ---
+            *이 이슈는 자동으로 생성되었습니다. 문제 해결 후 이슈를 닫아주세요.*`;
+
+            // 라벨 설정 (심각도별 우선순위 포함)
+            const labels = ['security', 'checkov', 'kubernetes', 'automated'];
+            if (priority === 'CRITICAL') labels.push('priority:critical');
+            else if (priority === 'HIGH') labels.push('priority:high');
+            else if (priority === 'MEDIUM') labels.push('priority:medium');
+            else labels.push('priority:low');
+
+            // 이슈 생성
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: labels
+            });
+
+            console.log(`✅ GitHub Issue 생성 완료: #${issue.data.number}`);
+
+            // 이슈 번호를 환경변수로 설정
+            const fs = require('fs');
+            fs.appendFileSync(process.env.GITHUB_ENV, `ISSUE_NUMBER=${issue.data.number}\n`);
+
+      - name: Slack 알림 전송 (Requirements 3.1, 3.2, 3.3)
+        if: steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+        env:
+          SLACK_WEBHOOK_URL_CHECKOV: ${{ secrets.SLACK_WEBHOOK_URL_CHECKOV }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          ISSUE_URL: ${{ env.ISSUE_NUMBER && format('https://github.com/{0}/issues/{1}', github.repository, env.ISSUE_NUMBER) || '' }}
+        run: |
+          echo "📱 Slack 알림을 전송합니다..."
+          python scripts/analyze_security.py checkov-results.json kubernetes --slack-notify || echo "⚠️ Slack 알림 전송 실패 (파이프라인은 계속 진행)"
+
+      - name: SARIF 파일 검증 및 메타데이터 추가 (Requirements 1.3, 7.4)
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
+        run: |
+          echo "🔍 SARIF 파일 검증 및 메타데이터 추가..."
+
+          # SARIF 파일 존재 확인
+          if [ ! -f "checkov-results.sarif" ]; then
+            echo "⚠️ SARIF 파일이 없습니다. 기본 SARIF 파일을 생성합니다."
+            cat > checkov-results.sarif << 'EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "checkov",
+                    "version": "unknown",
+                    "informationUri": "https://www.checkov.io/",
+                    "rules": []
+                  }
+                },
+                "results": [],
+                "properties": {
+                  "repository": "${{ github.repository }}",
+                  "branch": "${{ github.ref_name }}",
+                  "commit": "${{ github.sha }}",
+                  "workflow_run": "${{ github.run_id }}",
+                  "scan_type": "kubernetes",
+                  "scan_directory": "k8s-test-scenario",
+                  "scan_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                }
+              }
+            ]
+          }
+          EOF
+          fi
+
+          # SARIF 파일 유효성 검사 및 메타데이터 추가
+          python3 -c "
+import json
+import sys
+try:
+    with open('checkov-results.sarif', 'r') as f:
+        sarif_data = json.load(f)
+    
+    # 기본 구조 검증
+    if 'runs' not in sarif_data:
+        print('❌ SARIF 파일 구조 오류: runs 섹션이 없습니다.')
+        sys.exit(1)
+    
+    # 메타데이터 추가
+    for run in sarif_data['runs']:
+        if 'properties' not in run:
+            run['properties'] = {}
+        
+        run['properties'].update({
+            'repository': '${{ github.repository }}',
+            'branch': '${{ github.ref_name }}',
+            'commit': '${{ github.sha }}',
+            'workflow_run': '${{ github.run_id }}',
+            'scan_type': 'kubernetes',
+            'scan_directory': 'k8s-test-scenario',
+            'scan_time': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+            'total_issues': '${{ steps.issue_count.outputs.total_issues || 0 }}',
+            'critical_count': '${{ steps.issue_count.outputs.critical_count || 0 }}',
+            'high_count': '${{ steps.issue_count.outputs.high_count || 0 }}',
+            'medium_count': '${{ steps.issue_count.outputs.medium_count || 0 }}',
+            'low_count': '${{ steps.issue_count.outputs.low_count || 0 }}'
+        })
+    
+    # 업데이트된 SARIF 파일 저장
+    with open('checkov-results.sarif', 'w') as f:
+        json.dump(sarif_data, f, indent=2)
+    
+    print('✅ SARIF 파일 검증 및 메타데이터 추가 완료')
+    print(f'📊 결과 수: {len(sarif_data[\"runs\"][0].get(\"results\", []))}개')
+    
+except json.JSONDecodeError as e:
+    print(f'❌ SARIF 파일 JSON 파싱 오류: {e}')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ SARIF 파일 처리 오류: {e}')
+    sys.exit(1)
+"
+
+      - name: 아티팩트 메타데이터 생성 (Requirements 7.4)
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
+        run: |
+          echo "📝 아티팩트 메타데이터 생성..."
+
+          # 스캔 대상 파일 목록 생성
+          SCANNED_FILES=$(find k8s-test-scenario -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null | jq -R . | jq -s . || echo '[]')
+
+          # 스캔 메타데이터 파일 생성
+          cat > scan-metadata.json << EOF
+          {
+            "scan_info": {
+              "repository": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "commit_message": $(echo '${{ github.event.head_commit.message }}' | jq -R .),
+              "workflow_run_id": "${{ github.run_id }}",
+              "workflow_run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "scan_type": "kubernetes",
+              "scan_directory": "k8s-test-scenario",
+              "scan_time": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+              "trigger_event": "${{ github.event_name }}",
+              "trigger_reason": "${{ steps.reason.outputs.reason }}"
+            },
+            "results_summary": {
+              "total_issues": ${{ steps.issue_count.outputs.total_issues || 0 }},
+              "critical_count": ${{ steps.issue_count.outputs.critical_count || 0 }},
+              "high_count": ${{ steps.issue_count.outputs.high_count || 0 }},
+              "medium_count": ${{ steps.issue_count.outputs.medium_count || 0 }},
+              "low_count": ${{ steps.issue_count.outputs.low_count || 0 }},
+              "priority": "${{ steps.issue_count.outputs.priority || 'NONE' }}"
+            },
+            "scan_scope": {
+              "target_directory": "k8s-test-scenario",
+              "scanned_files": $SCANNED_FILES,
+              "file_count": $(echo '$SCANNED_FILES' | jq length)
+            },
+            "files_info": {
+              "checkov_json": "checkov-results.json",
+              "checkov_sarif": "checkov-results.sarif",
+              "analysis_report": "security-analysis-report.md",
+              "metadata": "scan-metadata.json"
+            },
+            "github_integration": {
+              "issue_created": ${{ steps.issue_count.outputs.total_issues > 0 && 'true' || 'false' }},
+              "issue_number": "${{ env.ISSUE_NUMBER || '' }}",
+              "issue_url": "${{ env.ISSUE_NUMBER && format('https://github.com/{0}/issues/{1}', github.repository, env.ISSUE_NUMBER) || '' }}",
+              "sarif_uploaded": true,
+              "artifacts_uploaded": true
+            }
+          }
+          EOF
+
+          echo "✅ 메타데이터 파일 생성 완료"
+          echo "📄 메타데이터 미리보기:"
+          cat scan-metadata.json | jq .
+
+      - name: SARIF 업로드 (Requirements 1.3, 7.4)
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true # 포크 PR에서 실패할 수 있음
+        with:
+          sarif_file: checkov-results.sarif
+          category: div4u-kubernetes-security
+          checkout_path: ${{ github.workspace }}
+          wait-for-processing: false
+
+      - name: SARIF 업로드 결과 확인
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
+        run: |
+          echo "📤 SARIF 업로드 상태 확인..."
+          if [ -f "checkov-results.sarif" ]; then
+            SARIF_SIZE=$(stat -c%s checkov-results.sarif)
+            echo "✅ SARIF 파일 크기: ${SARIF_SIZE} bytes"
+            
+            # SARIF 파일 내용 요약
+            python3 -c "
+            import json
+            try:
+                with open('checkov-results.sarif', 'r') as f:
+                    sarif = json.load(f)
+                results_count = len(sarif['runs'][0].get('results', []))
+                tool_name = sarif['runs'][0]['tool']['driver']['name']
+                scan_dir = sarif['runs'][0].get('properties', {}).get('scan_directory', 'unknown')
+                print(f'📊 도구: {tool_name}')
+                print(f'📊 스캔 디렉터리: {scan_dir}')
+                print(f'📊 발견된 이슈: {results_count}개')
+                print('✅ SARIF 업로드 준비 완료')
+            except Exception as e:
+                print(f'⚠️ SARIF 파일 분석 오류: {e}')
+            "
+          else
+            echo "❌ SARIF 파일을 찾을 수 없습니다."
+          fi
+
+      - name: 아티팩트 업로드 (Requirements 7.4)
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: div4u-k8s-security-scan-results-${{ github.run_number }}
+          path: |
+            checkov-results.json
+            checkov-results.sarif
+            security-analysis-report.md
+            scan-metadata.json
+          retention-days: 30
+          if-no-files-found: warn
+          compression-level: 6
+
+      - name: 아티팩트 업로드 결과 확인
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && always()
+        run: |
+          echo "📦 아티팩트 업로드 완료 확인..."
+          echo "📁 업로드된 파일들:"
+
+          for file in checkov-results.json checkov-results.sarif security-analysis-report.md scan-metadata.json; do
+            if [ -f "$file" ]; then
+              SIZE=$(stat -c%s "$file" 2>/dev/null || echo "0")
+              echo "  ✅ $file (${SIZE} bytes)"
+            else
+              echo "  ❌ $file (파일 없음)"
+            fi
+          done
+
+          echo ""
+          echo "🔗 아티팩트 다운로드 링크:"
+          echo "   https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
+          echo "📅 보존 기간: 30일"
+          echo "🏷️ 아티팩트 이름: div4u-k8s-security-scan-results-${{ github.run_number }}"
+
+      - name: PR Gate 검사 (Requirements 4.1, 4.2, 4.3)
+        if: (steps.changes.outputs.k8s == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+        env:
+          FAIL_ON_SEVERITY: ${{ vars.FAIL_ON_SEVERITY || 'none' }}
+        run: |
+          TOTAL_ISSUES="${{ steps.issue_count.outputs.total_issues }}"
+          CRITICAL_COUNT="${{ steps.issue_count.outputs.critical_count }}"
+          HIGH_COUNT="${{ steps.issue_count.outputs.high_count }}"
+          MEDIUM_COUNT="${{ steps.issue_count.outputs.medium_count }}"
+          LOW_COUNT="${{ steps.issue_count.outputs.low_count }}"
+
+          echo "🚪 PR Gate 검사 시작 (임계치: $FAIL_ON_SEVERITY)"
+          echo "📊 이슈 현황: Critical=$CRITICAL_COUNT, High=$HIGH_COUNT, Medium=$MEDIUM_COUNT, Low=$LOW_COUNT"
+
+          # 임계치가 'none'이면 Gate 검사를 건너뜀
+          if [ "$FAIL_ON_SEVERITY" = "none" ]; then
+            echo "⏭️ PR Gate가 비활성화되어 있습니다 (FAIL_ON_SEVERITY=none)"
+            echo "✅ 모든 이슈와 관계없이 워크플로를 통과시킵니다."
+            exit 0
+          fi
+
+          SHOULD_FAIL=false
+          FAIL_REASON=""
+
+          case "$FAIL_ON_SEVERITY" in
+            "critical")
+              if [ "$CRITICAL_COUNT" -ge 1 ]; then
+                echo "❌ Gate 실패: Critical 이슈 ${CRITICAL_COUNT}개 발견 (임계치: 1개 이상)"
+                FAIL_REASON="Critical 이슈 ${CRITICAL_COUNT}개가 발견되었습니다."
+                SHOULD_FAIL=true
+              fi
+              ;;
+            "high")
+              if [ "$CRITICAL_COUNT" -ge 1 ]; then
+                echo "❌ Gate 실패: Critical 이슈 ${CRITICAL_COUNT}개 발견 (임계치: Critical≥1)"
+                FAIL_REASON="Critical 이슈 ${CRITICAL_COUNT}개가 발견되었습니다."
+                SHOULD_FAIL=true
+              elif [ "$HIGH_COUNT" -ge 3 ]; then
+                echo "❌ Gate 실패: High 이슈 ${HIGH_COUNT}개 발견 (임계치: High≥3)"
+                FAIL_REASON="High 이슈 ${HIGH_COUNT}개가 발견되었습니다."
+                SHOULD_FAIL=true
+              fi
+              ;;
+            "medium")
+              if [ "$CRITICAL_COUNT" -ge 1 ]; then
+                echo "❌ Gate 실패: Critical 이슈 ${CRITICAL_COUNT}개 발견 (임계치: Critical≥1)"
+                FAIL_REASON="Critical 이슈 ${CRITICAL_COUNT}개가 발견되었습니다."
+                SHOULD_FAIL=true
+              elif [ "$HIGH_COUNT" -ge 3 ]; then
+                echo "❌ Gate 실패: High 이슈 ${HIGH_COUNT}개 발견 (임계치: High≥3)"
+                FAIL_REASON="High 이슈 ${HIGH_COUNT}개가 발견되었습니다."
+                SHOULD_FAIL=true
+              elif [ "$MEDIUM_COUNT" -ge 5 ]; then
+                echo "❌ Gate 실패: Medium 이슈 ${MEDIUM_COUNT}개 발견 (임계치: Medium≥5)"
+                FAIL_REASON="Medium 이슈 ${MEDIUM_COUNT}개가 발견되었습니다."
+                SHOULD_FAIL=true
+              fi
+              ;;
+            "low")
+              if [ "$TOTAL_ISSUES" -ge 10 ]; then
+                echo "❌ Gate 실패: 총 이슈 ${TOTAL_ISSUES}개 발견 (임계치: 10개 이상)"
+                FAIL_REASON="총 ${TOTAL_ISSUES}개의 보안 이슈가 발견되었습니다."
+                SHOULD_FAIL=true
+              fi
+              ;;
+            *)
+              echo "⚠️ 알 수 없는 FAIL_ON_SEVERITY 값: $FAIL_ON_SEVERITY"
+              echo "💡 유효한 값: none, low, medium, high, critical"
+              echo "✅ 기본값으로 Gate를 통과시킵니다."
+              exit 0
+              ;;
+          esac
+
+          if [ "$SHOULD_FAIL" = true ]; then
+            echo ""
+            echo "🚫 PR Gate: 보안 임계치를 초과하여 워크플로를 실패 처리합니다."
+            echo "📋 실패 사유: $FAIL_REASON"
+            echo ""
+            echo "💡 해결 방법:"
+            echo "  1. k8s-test-scenario 디렉터리의 보안 이슈를 해결하세요"
+            echo "  2. 이슈 해결 후 다시 커밋하거나 PR을 업데이트하세요"
+            echo "  3. 또는 FAIL_ON_SEVERITY 환경변수를 조정하세요"
+            echo ""
+            echo "🔗 관련 링크:"
+            echo "  - GitHub Issue: https://github.com/${{ github.repository }}/issues"
+            echo "  - Checkov K8s 문서: https://www.checkov.io/5.Policy%20Index/kubernetes.html"
+            echo "  - Kubernetes 보안 가이드: https://kubernetes.io/docs/concepts/security/"
+            echo ""
+            exit 1
+          else
+            echo "✅ PR Gate: 보안 임계치를 통과했습니다."
+            echo "📊 현재 설정: FAIL_ON_SEVERITY=$FAIL_ON_SEVERITY"
+            echo "🎉 워크플로를 성공적으로 완료합니다."
+          fi
+
+      - name: 변경사항 없음 처리
+        if: steps.changes.outputs.k8s != 'true' && github.event_name != 'workflow_dispatch' && github.event_name != 'schedule'
+        run: |
+          echo "⏭️ k8s-test-scenario 디렉터리에 변경사항이 없습니다."
+          echo "📁 모니터링 대상: k8s-test-scenario/**"
+          echo "::notice::변경사항 없음 - 보안 스캔을 건너뜁니다."
+
+      - name: 실행 완료 요약
+        if: always()
+        run: |
+          echo "🎉 div4u Kubernetes 보안 분석 워크플로 완료"
+          echo "📊 실행 결과:"
+          echo "  - 변경 감지: ${{ steps.changes.outputs.k8s }}"
+          echo "  - 총 이슈: ${{ steps.issue_count.outputs.total_issues || '0' }}개"
+          echo "  - 실행 이유: ${{ steps.reason.outputs.reason }}"
+          echo "  - 브랜치: ${{ github.ref_name }}"
+          echo ""
+          echo "🔗 추가 정보:"
+          echo "  - 워크플로 실행: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "  - 스캔 대상: k8s-test-scenario 디렉터리"

@@ -1,0 +1,141 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: insecure-test-pod
+  namespace: div4u-dev
+  labels:
+    app: insecure-test
+spec:
+  # 취약점 1: 자동 마운트된 서비스 어카운트 토큰
+  automountServiceAccountToken: true
+  
+  # 취약점 2: 호스트 네트워크 사용
+  hostNetwork: true
+  
+  # 취약점 3: 호스트 PID 사용
+  hostPID: true
+  
+  containers:
+  - name: insecure-container
+    image: ubuntu:16.04  # 취약점 4: 매우 오래된 우분투 이미지
+    command: ["/bin/bash"]
+    args: ["-c", "while true; do sleep 30; done"]
+    
+    # 취약점 5: 리소스 제한 없음
+    # resources 설정 없음
+    
+    # 취약점 6: 환경변수에 민감한 정보
+    env:
+    - name: DB_PASSWORD
+      value: "root123"
+    - name: JWT_SECRET
+      value: "my-super-secret-jwt-key"
+    - name: ADMIN_TOKEN
+      value: "admin-token-12345"
+    
+    # 취약점 7: 위험한 보안 컨텍스트
+    securityContext:
+      privileged: true                    # 모든 권한 허용
+      allowPrivilegeEscalation: true     # 권한 상승 허용
+      runAsUser: 0                       # root 사용자
+      runAsGroup: 0                      # root 그룹
+      runAsNonRoot: false               # 루트 실행 허용
+      readOnlyRootFilesystem: false     # 쓰기 가능한 루트 파일시스템
+      capabilities:
+        add:
+        - SYS_ADMIN                     # 시스템 관리 권한
+        - NET_ADMIN                     # 네트워크 관리 권한
+        - SYS_TIME                      # 시스템 시간 변경 권한
+        - SYS_MODULE                    # 커널 모듈 로드 권한
+    
+    # 취약점 8: 위험한 볼륨 마운트
+    volumeMounts:
+    - name: host-root
+      mountPath: /host-root
+    - name: host-proc
+      mountPath: /host-proc
+    - name: host-sys
+      mountPath: /host-sys
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+    - name: host-dev
+      mountPath: /host-dev
+    
+    # 취약점 9: 모든 포트 노출
+    ports:
+    - containerPort: 22    # SSH
+    - containerPort: 23    # Telnet
+    - containerPort: 80    # HTTP
+    - containerPort: 443   # HTTPS
+    - containerPort: 3306  # MySQL
+    - containerPort: 5432  # PostgreSQL
+    - containerPort: 6379  # Redis
+    - containerPort: 27017 # MongoDB
+    - containerPort: 9200  # Elasticsearch
+    
+  # 취약점 10: 위험한 볼륨들
+  volumes:
+  - name: host-root
+    hostPath:
+      path: /
+      type: Directory
+  - name: host-proc
+    hostPath:
+      path: /proc
+      type: Directory
+  - name: host-sys
+    hostPath:
+      path: /sys
+      type: Directory
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
+      type: Socket
+  - name: host-dev
+    hostPath:
+      path: /dev
+      type: Directory
+  
+  # 취약점 11: 관대한 DNS 정책
+  dnsPolicy: Default
+  
+  # 취약점 12: 보안 컨텍스트 없음 (Pod 레벨)
+  # securityContext 설정 없음
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: insecure-secret
+  namespace: div4u-dev
+type: Opaque
+data:
+  # 취약점 13: 약한 base64 인코딩 (쉽게 디코딩 가능)
+  username: YWRtaW4=  # admin
+  password: cGFzc3dvcmQxMjM=  # password123
+  api-key: c2VjcmV0LWtleS0xMjM0NQ==  # secret-key-12345
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: insecure-cluster-role
+rules:
+# 취약점 14: 과도한 RBAC 권한
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]  # 모든 리소스에 대한 모든 권한
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: insecure-cluster-binding
+subjects:
+- kind: ServiceAccount
+  name: default  # 취약점 15: default 서비스 어카운트에 과도한 권한 부여
+  namespace: div4u-dev
+roleRef:
+  kind: ClusterRole
+  name: insecure-cluster-role
+  apiGroup: rbac.authorization.k8s.io
